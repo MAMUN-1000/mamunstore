@@ -1,0 +1,59 @@
+import express from 'express';
+import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import 'dotenv/config';
+
+const app = express();
+
+// ==========================================
+// Global Middleware
+// ==========================================
+
+// 1. CORS: Allow requests from the frontend client
+const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
+app.use(
+  cors({
+    origin: allowedOrigin,
+    credentials: true, // Allows cookies to be sent across origins
+  })
+);
+
+// 2. Body Parsers: Parse JSON payloads and URL-encoded form data
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 3. Cookie Parser: Parses cookies attached to client requests into req.cookies
+app.use(cookieParser());
+
+// ==========================================
+// Routes
+// ==========================================
+
+// Health Check Endpoint (used to test frontend-backend connectivity)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'E-commerce API is running healthy',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// 404 Handler for any unknown routes
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled Server Error:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+  });
+});
+
+export default app;

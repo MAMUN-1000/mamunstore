@@ -1,0 +1,18 @@
+{
+  "name": "internship-ecommerce",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack e-commerce project built with React, Node.js, Express, and PostgreSQL",
+  "scripts": {
+    "server": "npm run dev --prefix server",
+    "client": "npm run dev --prefix client"
+  },
+  "keywords": [
+    "react",
+    "express",
+    "ecommerce",
+    "fullstack"
+  ],
+  "author": "",
+  "license": "ISC"
+}
