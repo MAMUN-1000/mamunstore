@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import prisma from './config/db.js';
+import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 
@@ -68,6 +69,9 @@ app.get('/api/health/db', async (req, res) => {
     });
   }
 });
+
+// Authentication Routes
+app.use('/api/auth', authRoutes);
 
 // 404 Handler for any unknown routes
 app.use((req, res, next) => {
