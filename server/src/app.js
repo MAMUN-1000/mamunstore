@@ -4,6 +4,8 @@ import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import prisma from './config/db.js';
 import authRoutes from './routes/auth.routes.js';
+import categoryRoutes from './routes/category.routes.js';
+import productRoutes from './routes/product.routes.js';
 
 const app = express();
 
@@ -72,6 +74,10 @@ app.get('/api/health/db', async (req, res) => {
 
 // Authentication Routes
 app.use('/api/auth', authRoutes);
+
+// Catalog Routes
+app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
 
 // 404 Handler for any unknown routes
 app.use((req, res, next) => {

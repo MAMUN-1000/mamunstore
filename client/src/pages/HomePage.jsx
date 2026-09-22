@@ -25,32 +25,31 @@ export const HomePage = () => {
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
+            <Link
+              to="/products"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Browse Catalog
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+
             {user ? (
               <Link
                 to="/profile"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20"
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition border border-white/20"
               >
                 <UserCheck className="w-4 h-4" />
-                Go to Profile ({user.name})
-                <ArrowRight className="w-4 h-4" />
+                Profile ({user.name})
               </Link>
             ) : (
-              <>
-                <Link
-                  to="/register"
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm transition shadow-lg shadow-emerald-500/20"
-                >
-                  Create an Account
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition border border-white/20"
-                >
-                  <KeyRound className="w-4 h-4" />
-                  Sign In
-                </Link>
-              </>
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 px-5 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition border border-white/20"
+              >
+                <KeyRound className="w-4 h-4" />
+                Sign In
+              </Link>
             )}
           </div>
         </div>

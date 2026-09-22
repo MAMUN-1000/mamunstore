@@ -33,6 +33,13 @@ export const Navbar = () => {
             Home
           </Link>
 
+          <Link
+            to="/products"
+            className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors"
+          >
+            Catalog
+          </Link>
+
           {/* Admin link if user is ADMIN */}
           {isAdmin && (
             <Link
