@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
+import prisma from './config/db.js';
 
 const app = express();
 
@@ -37,6 +38,35 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
   });
+});
+
+// Database Health Check Endpoint (tests PostgreSQL connectivity via Prisma)
+app.get('/api/health/db', async (req, res) => {
+  try {
+    // Ping database with a lightweight query
+    await prisma.$queryRaw`SELECT 1`;
+    const productCount = await prisma.product.count();
+    const categoryCount = await prisma.category.count();
+    const userCount = await prisma.user.count();
+
+    res.status(200).json({
+      success: true,
+      message: 'Database is connected and healthy',
+      database: 'PostgreSQL',
+      counts: {
+        categories: categoryCount,
+        products: productCount,
+        users: userCount,
+      },
+    });
+  } catch (err) {
+    console.error('Database connection error:', err.message);
+    res.status(503).json({
+      success: false,
+      message: 'Database connection failed',
+      error: err.message,
+    });
+  }
 });
 
 // 404 Handler for any unknown routes
