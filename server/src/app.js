@@ -13,11 +13,24 @@ const app = express();
 // Global Middleware
 // ==========================================
 
-// 1. CORS: Allow requests from the frontend client
-const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
+// 1. CORS: Allow requests from frontend client ports
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS blocked for origin: ${origin}`));
+      }
+    },
     credentials: true, // Allows cookies to be sent across origins
   })
 );
