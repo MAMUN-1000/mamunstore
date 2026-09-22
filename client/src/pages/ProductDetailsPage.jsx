@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
+import { useCart } from '../context/CartContext';
 import {
   ArrowLeft,
   ShoppingBag,
@@ -17,12 +18,12 @@ import {
 export const ProductDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { addToCart } = useCart();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [addedNotice, setAddedNotice] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -51,9 +52,10 @@ export const ProductDetailsPage = () => {
     });
   };
 
-  const handleAddToCartDummy = () => {
-    setAddedNotice(true);
-    setTimeout(() => setAddedNotice(false), 3000);
+  const handleAddToCart = () => {
+    if (product) {
+      addToCart(product, quantity);
+    }
   };
 
   if (loading) {
@@ -182,21 +184,15 @@ export const ProductDetailsPage = () => {
                   </div>
                 </div>
 
-                {/* Add to Cart Button (Ready for Phase 6) */}
+                {/* Add to Cart Button */}
                 <button
                   type="button"
-                  onClick={handleAddToCartDummy}
+                  onClick={handleAddToCart}
                   className="w-full py-3.5 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group"
                 >
                   <ShoppingBag className="w-4 h-4 group-hover:scale-110 transition-transform" />
                   Add {quantity} to Cart (${(product.price * quantity).toFixed(2)})
                 </button>
-
-                {addedNotice && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center text-xs font-medium text-emerald-800 animate-fadeIn">
-                    ✓ Selected {quantity} items. Cart state management will be activated in <strong>Phase 6</strong>!
-                  </div>
-                )}
               </div>
             ) : (
               <button

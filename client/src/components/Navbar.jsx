@@ -1,9 +1,11 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShoppingBag, User, LogOut, ShieldCheck, LogIn, UserPlus } from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { ShoppingBag, User, LogOut, ShieldCheck, LogIn, UserPlus, ShoppingCart } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, logout, loading, isAdmin } = useAuth();
+  const { itemCount, toggleCart } = useCart();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -52,8 +54,22 @@ export const Navbar = () => {
           )}
         </nav>
 
-        {/* Right / Auth Controls */}
-        <div className="flex items-center gap-3">
+        {/* Right / Auth & Cart Controls */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Cart Drawer Trigger */}
+          <button
+            onClick={toggleCart}
+            className="relative p-2 rounded-xl text-slate-700 hover:text-emerald-600 hover:bg-slate-100 transition mr-1"
+            title="Open Shopping Cart"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            {itemCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-emerald-600 text-white font-bold text-[11px] flex items-center justify-center shadow-sm">
+                {itemCount}
+              </span>
+            )}
+          </button>
+
           {loading ? (
             <div className="w-20 h-8 bg-slate-100 animate-pulse rounded-lg" />
           ) : user ? (
