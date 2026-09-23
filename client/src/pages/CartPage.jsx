@@ -200,10 +200,10 @@ export const CartPage = () => {
             </div>
 
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/checkout')}
               className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 group"
             >
-              Proceed to Checkout (Phase 7)
+              Proceed to Checkout
               <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
 

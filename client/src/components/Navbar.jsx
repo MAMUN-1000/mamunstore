@@ -42,6 +42,15 @@ export const Navbar = () => {
             Catalog
           </Link>
 
+          {user && (
+            <Link
+              to="/orders"
+              className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors"
+            >
+              My Orders
+            </Link>
+          )}
+
           {/* Admin link if user is ADMIN */}
           {isAdmin && (
             <Link

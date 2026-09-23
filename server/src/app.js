@@ -6,6 +6,7 @@ import prisma from './config/db.js';
 import authRoutes from './routes/auth.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
+import orderRoutes from './routes/order.routes.js';
 
 const app = express();
 
@@ -91,6 +92,9 @@ app.use('/api/auth', authRoutes);
 // Catalog Routes
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
+
+// Order Routes
+app.use('/api/orders', orderRoutes);
 
 // 404 Handler for any unknown routes
 app.use((req, res, next) => {
