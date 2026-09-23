@@ -37,17 +37,6 @@ export const LoginPage = () => {
     }
   };
 
-  // Helper buttons to quickly test seeded credentials
-  const fillDemoAdmin = () => {
-    setEmail('admin@ecommerce.com');
-    setPassword('adminpassword123');
-  };
-
-  const fillDemoCustomer = () => {
-    setEmail('customer@example.com');
-    setPassword('password123');
-  };
-
   return (
     <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-sm space-y-6">
@@ -115,29 +104,6 @@ export const LoginPage = () => {
             {submitting ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-
-        {/* Quick Demo Helper Section */}
-        <div className="pt-4 border-t border-slate-100 space-y-2">
-          <p className="text-[11px] font-medium text-slate-500 text-center uppercase tracking-wider">
-            Quick Fill Demo Credentials
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={fillDemoCustomer}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
-            >
-              Demo Customer
-            </button>
-            <button
-              type="button"
-              onClick={fillDemoAdmin}
-              className="px-2.5 py-1.5 rounded-lg border border-purple-200 text-xs font-medium text-purple-700 bg-purple-50/50 hover:bg-purple-100 transition"
-            >
-              Demo Admin
-            </button>
-          </div>
-        </div>
 
         {/* Footer Link */}
         <p className="text-center text-xs text-slate-500 pt-2">
