@@ -180,3 +180,116 @@ export const getOrderById = async (orderId, userId, userRole) => {
 
   return order;
 };
+
+/**
+ * Administrator: Retrieve all customer orders with filtering and pagination
+ */
+export const getAllOrdersAdmin = async ({ page = 1, limit = 10, status }) => {
+  const pageNumber = Math.max(1, parseInt(page, 10) || 1);
+  const pageSize = Math.max(1, parseInt(limit, 10) || 10);
+  const skip = (pageNumber - 1) * pageSize;
+
+  const where = {};
+  if (status && status !== 'ALL') {
+    where.status = status;
+  }
+
+  const [orders, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      skip,
+      take: pageSize,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                imageUrl: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / pageSize) || 1;
+
+  return {
+    orders,
+    pagination: {
+      total,
+      page: pageNumber,
+      limit: pageSize,
+      totalPages,
+    },
+  };
+};
+
+/**
+ * Administrator: Update the fulfillment status of an order
+ */
+export const updateOrderStatusAdmin = async (orderId, newStatus) => {
+  const parsedId = parseInt(orderId, 10);
+  if (isNaN(parsedId)) {
+    const error = new Error('Invalid order ID provided.');
+    error.status = 400;
+    throw error;
+  }
+
+  const validStatuses = ['PENDING', 'PAID', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
+  if (!validStatuses.includes(newStatus)) {
+    const error = new Error(
+      `Invalid order status. Must be one of: ${validStatuses.join(', ')}`
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  const existingOrder = await prisma.order.findUnique({
+    where: { id: parsedId },
+  });
+
+  if (!existingOrder) {
+    const error = new Error('Order not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  const updatedOrder = await prisma.order.update({
+    where: { id: parsedId },
+    data: {
+      status: newStatus,
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+      items: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+
+  return updatedOrder;
+};
+

@@ -44,3 +44,58 @@ export const getProductById = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Create a new product (Admin only)
+ * POST /api/products
+ */
+export const createProduct = async (req, res, next) => {
+  try {
+    const product = await productService.createProduct(req.body);
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product created successfully.',
+      data: { product },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Update an existing product (Admin only)
+ * PUT /api/products/:id
+ */
+export const updateProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const product = await productService.updateProduct(id, req.body);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Product updated successfully.',
+      data: { product },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Delete a product (Admin only)
+ * DELETE /api/products/:id
+ */
+export const deleteProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await productService.deleteProduct(id);
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

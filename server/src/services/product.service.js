@@ -168,13 +168,205 @@ export const getProductById = async (id) => {
     }
   }
 
-  return {
-    ...product,
-    stats: {
-      totalReviews,
-      averageRating,
-      breakdown,
-      percentages,
-    },
+    return {
+      ...product,
+      stats: {
+        totalReviews,
+        averageRating,
+        breakdown,
+        percentages,
+      },
+    };
   };
-};
+
+  /**
+   * Administrator: Create a new product
+   */
+  export const createProduct = async ({
+    name,
+    description,
+    price,
+    stock,
+    imageUrl,
+    categoryId,
+  }) => {
+    if (!name || !name.trim()) {
+      const error = new Error('Product name is required.');
+      error.status = 400;
+      throw error;
+    }
+
+    const parsedPrice = parseFloat(price);
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
+      const error = new Error('Valid non-negative price is required.');
+      error.status = 400;
+      throw error;
+    }
+
+    const parsedStock = parseInt(stock, 10);
+    if (isNaN(parsedStock) || parsedStock < 0) {
+      const error = new Error('Valid non-negative stock count is required.');
+      error.status = 400;
+      throw error;
+    }
+
+    const parsedCategoryId = parseInt(categoryId, 10);
+    if (isNaN(parsedCategoryId)) {
+      const error = new Error('Valid category must be selected.');
+      error.status = 400;
+      throw error;
+    }
+
+    // Verify Category exists
+    const category = await prisma.category.findUnique({
+      where: { id: parsedCategoryId },
+    });
+    if (!category) {
+      const error = new Error('Selected category does not exist.');
+      error.status = 404;
+      throw error;
+    }
+
+    // Generate unique slug
+    const baseSlug = name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+    const slug = `${baseSlug}-${Date.now().toString().slice(-6)}`;
+
+    const newProduct = await prisma.product.create({
+      data: {
+        name: name.trim(),
+        slug,
+        description: description ? description.trim() : '',
+        price: parsedPrice,
+        stock: parsedStock,
+        imageUrl:
+          imageUrl && imageUrl.trim()
+            ? imageUrl.trim()
+            : 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=600&auto=format&fit=crop&q=80',
+        categoryId: parsedCategoryId,
+      },
+      include: {
+        category: true,
+      },
+    });
+
+    return newProduct;
+  };
+
+  /**
+   * Administrator: Update an existing product
+   */
+  export const updateProduct = async (id, updateData) => {
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      const error = new Error('Invalid product ID.');
+      error.status = 400;
+      throw error;
+    }
+
+    const existing = await prisma.product.findUnique({
+      where: { id: parsedId },
+    });
+
+    if (!existing) {
+      const error = new Error('Product not found.');
+      error.status = 404;
+      throw error;
+    }
+
+    const dataToUpdate = {};
+
+    if (updateData.name !== undefined) {
+      dataToUpdate.name = updateData.name.trim();
+    }
+    if (updateData.description !== undefined) {
+      dataToUpdate.description = updateData.description.trim();
+    }
+    if (updateData.price !== undefined) {
+      const p = parseFloat(updateData.price);
+      if (isNaN(p) || p < 0) {
+        const error = new Error('Valid non-negative price is required.');
+        error.status = 400;
+        throw error;
+      }
+      dataToUpdate.price = p;
+    }
+    if (updateData.stock !== undefined) {
+      const s = parseInt(updateData.stock, 10);
+      if (isNaN(s) || s < 0) {
+        const error = new Error('Valid non-negative stock count is required.');
+        error.status = 400;
+        throw error;
+      }
+      dataToUpdate.stock = s;
+    }
+    if (updateData.imageUrl !== undefined && updateData.imageUrl.trim()) {
+      dataToUpdate.imageUrl = updateData.imageUrl.trim();
+    }
+    if (updateData.categoryId !== undefined) {
+      const cId = parseInt(updateData.categoryId, 10);
+      if (!isNaN(cId)) {
+        const cat = await prisma.category.findUnique({ where: { id: cId } });
+        if (!cat) {
+          const error = new Error('Category not found.');
+          error.status = 404;
+          throw error;
+        }
+        dataToUpdate.categoryId = cId;
+      }
+    }
+
+    const updated = await prisma.product.update({
+      where: { id: parsedId },
+      data: dataToUpdate,
+      include: {
+        category: true,
+      },
+    });
+
+    return updated;
+  };
+
+  /**
+   * Administrator: Delete a product (protected against deleting items with order history)
+   */
+  export const deleteProduct = async (id) => {
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      const error = new Error('Invalid product ID.');
+      error.status = 400;
+      throw error;
+    }
+
+    const existing = await prisma.product.findUnique({
+      where: { id: parsedId },
+    });
+
+    if (!existing) {
+      const error = new Error('Product not found.');
+      error.status = 404;
+      throw error;
+    }
+
+    // Check for foreign key restriction with past customer orders
+    const orderItemsCount = await prisma.orderItem.count({
+      where: { productId: parsedId },
+    });
+
+    if (orderItemsCount > 0) {
+      const error = new Error(
+        'Cannot delete this product because it has past customer order history in the system. To discontinue it, please set its stock to 0.'
+      );
+      error.status = 400;
+      throw error;
+    }
+
+    await prisma.product.delete({
+      where: { id: parsedId },
+    });
+
+    return { message: 'Product deleted successfully.' };
+  };

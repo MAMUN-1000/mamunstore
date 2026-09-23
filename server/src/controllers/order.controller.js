@@ -80,3 +80,43 @@ export const getOrderById = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Administrator: Get all platform orders
+ * GET /api/orders/admin/all
+ */
+export const getAllOrdersAdmin = async (req, res, next) => {
+  try {
+    const { page, limit, status } = req.query;
+    const result = await orderService.getAllOrdersAdmin({ page, limit, status });
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Administrator: Update an order status
+ * PATCH /api/orders/admin/:id/status
+ */
+export const updateOrderStatusAdmin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const order = await orderService.updateOrderStatusAdmin(id, status);
+
+    return res.status(200).json({
+      success: true,
+      message: `Order status successfully updated to ${status}.`,
+      data: { order },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
