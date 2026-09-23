@@ -69,6 +69,11 @@ export const getProducts = async ({
             slug: true,
           },
         },
+        reviews: {
+          select: {
+            rating: true,
+          },
+        },
       },
       skip,
       take: pageSize,
@@ -79,8 +84,23 @@ export const getProducts = async ({
 
   const totalPages = Math.ceil(total / pageSize) || 1;
 
+  // Enrich products with computed rating metrics
+  const enrichedProducts = products.map((prod) => {
+    const count = prod.reviews?.length || 0;
+    const avg =
+      count > 0
+        ? Number((prod.reviews.reduce((acc, r) => acc + r.rating, 0) / count).toFixed(1))
+        : 0;
+    const { reviews, ...rest } = prod;
+    return {
+      ...rest,
+      reviewCount: count,
+      averageRating: avg,
+    };
+  });
+
   return {
-    products,
+    products: enrichedProducts,
     pagination: {
       total,
       page: pageNumber,
@@ -127,5 +147,34 @@ export const getProductById = async (id) => {
     throw error;
   }
 
-  return product;
+  // Calculate review aggregation statistics
+  const totalReviews = product.reviews.length;
+  let averageRating = 0;
+  const breakdown = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  const percentages = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+
+  if (totalReviews > 0) {
+    const sum = product.reviews.reduce((acc, r) => {
+      if (breakdown[r.rating] !== undefined) {
+        breakdown[r.rating] += 1;
+      }
+      return acc + r.rating;
+    }, 0);
+
+    averageRating = Number((sum / totalReviews).toFixed(1));
+
+    for (let star = 1; star <= 5; star++) {
+      percentages[star] = Math.round((breakdown[star] / totalReviews) * 100);
+    }
+  }
+
+  return {
+    ...product,
+    stats: {
+      totalReviews,
+      averageRating,
+      breakdown,
+      percentages,
+    },
+  };
 };

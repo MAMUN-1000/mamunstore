@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { Eye, CheckCircle2, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { Eye, CheckCircle2, AlertTriangle, ShoppingCart, Star } from 'lucide-react';
 import { formatBDT } from '../utils/currency';
 
 export const ProductCard = ({ product }) => {
@@ -53,6 +53,17 @@ export const ProductCard = ({ product }) => {
           <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
             {product.description}
           </p>
+
+          {/* Rating Pill */}
+          <div className="flex items-center gap-1.5 pt-1">
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <span className="text-xs font-bold text-slate-800">
+              {product.averageRating > 0 ? product.averageRating : 'New'}
+            </span>
+            <span className="text-[11px] text-slate-400">
+              ({product.reviewCount || 0})
+            </span>
+          </div>
         </div>
 
         {/* Price & Action */}

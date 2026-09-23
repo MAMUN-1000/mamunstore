@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
 import orderRoutes from './routes/order.routes.js';
+import reviewRoutes from './routes/review.routes.js';
 
 const app = express();
 
@@ -95,6 +96,9 @@ app.use('/api/products', productRoutes);
 
 // Order Routes
 app.use('/api/orders', orderRoutes);
+
+// Review & Ratings Routes
+app.use('/api', reviewRoutes);
 
 // 404 Handler for any unknown routes
 app.use((req, res, next) => {
