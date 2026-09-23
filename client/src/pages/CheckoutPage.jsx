@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
+import { formatBDT, formatUSD, formatDualPrice } from '../utils/currency';
 import {
   ShieldCheck,
   CreditCard,
@@ -13,32 +14,107 @@ import {
   ShoppingBag,
   MapPin,
   CheckCircle2,
+  Phone,
+  Banknote,
+  Smartphone,
+  Building,
+  HelpCircle,
 } from 'lucide-react';
+
+const BD_DIVISIONS = [
+  'Dhaka',
+  'Chattogram',
+  'Rajshahi',
+  'Khulna',
+  'Barishal',
+  'Sylhet',
+  'Rangpur',
+  'Mymensingh',
+];
+
+const LOCAL_PRESETS = [
+  {
+    label: 'Jahangirnagar University (JU), Savar',
+    division: 'Dhaka',
+    city: 'Dhaka',
+    area: 'Savar (Jahangirnagar University Campus)',
+    postalCode: '1342',
+    streetExample: 'Al-Beruni Hall, Room 302, Jahangirnagar University',
+  },
+  {
+    label: 'Mirpur, Dhaka',
+    division: 'Dhaka',
+    city: 'Dhaka',
+    area: 'Mirpur-10',
+    postalCode: '1216',
+    streetExample: 'House 14, Road 5, Block B, Mirpur',
+  },
+  {
+    label: 'Dhanmondi, Dhaka',
+    division: 'Dhaka',
+    city: 'Dhaka',
+    area: 'Dhanmondi',
+    postalCode: '1209',
+    streetExample: 'Road 27 (Old), House 42, Dhanmondi',
+  },
+  {
+    label: 'Uttara, Dhaka',
+    division: 'Dhaka',
+    city: 'Dhaka',
+    area: 'Uttara Sector 7',
+    postalCode: '1230',
+    streetExample: 'Sector 7, Road 12, House 8, Uttara',
+  },
+  {
+    label: 'Agrabad, Chattogram',
+    division: 'Chattogram',
+    city: 'Chattogram',
+    area: 'Agrabad C/A',
+    postalCode: '4100',
+    streetExample: 'Agrabad Commercial Area, Road 3',
+  },
+];
 
 export const CheckoutPage = () => {
   const { cartItems, subtotal, shipping, estimatedTax, grandTotal, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Form State
+  // Destination Region Toggle: Bangladesh vs International
+  const [destinationType, setDestinationType] = useState('bangladesh'); // 'bangladesh' | 'international'
+
+  // Shipping Address State
   const [shippingAddress, setShippingAddress] = useState({
-    street: '',
-    city: '',
+    street: 'Al-Beruni Hall, Room 302, Jahangirnagar University',
+    city: 'Dhaka',
+    division: 'Dhaka',
     state: '',
-    postalCode: '',
-    country: 'United States',
-    phone: '',
+    postalCode: '1342',
+    country: 'Bangladesh',
+    phone: '01712345678',
+    deliveryInstructions: 'Call upon arriving at the campus gate.',
   });
 
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  // Payment State
+  const [paymentMethod, setPaymentMethod] = useState('bkash'); // 'bkash' | 'nagad' | 'cod' | 'card'
+  const [mfsNumber, setMfsNumber] = useState('01712345678');
+  const [mfsPin, setMfsPin] = useState('12345');
+  const [cardDetails, setCardDetails] = useState({
+    cardNumber: '4242 •••• •••• 4242',
+    expiry: '12/28',
+    cvv: '888',
+  });
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
 
   // If cart is empty, prompt user to add items first
   if (cartItems.length === 0) {
     return (
-      <div className="max-w-md mx-auto my-20 p-8 bg-white border border-slate-200 rounded-2xl text-center space-y-4 shadow-sm">
-        <ShoppingBag className="w-12 h-12 text-slate-400 mx-auto" />
+      <div className="max-w-md mx-auto my-20 p-8 bg-white border border-slate-200 rounded-3xl text-center space-y-4 shadow-sm">
+        <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
+          <ShoppingBag className="w-8 h-8" />
+        </div>
         <h2 className="text-xl font-bold text-slate-900">Your Cart is Empty</h2>
         <p className="text-xs text-slate-500">
           You cannot proceed to checkout without any items in your cart.
@@ -58,30 +134,63 @@ export const CheckoutPage = () => {
     setShippingAddress((prev) => ({ ...prev, [name]: value }));
   };
 
+  const applyLocalPreset = (preset) => {
+    setShippingAddress((prev) => ({
+      ...prev,
+      division: preset.division,
+      city: preset.city,
+      postalCode: preset.postalCode,
+      street: preset.streetExample,
+      country: 'Bangladesh',
+    }));
+  };
+
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    // Manual Validation
+    // Validation
     if (!shippingAddress.street.trim()) {
-      setErrorMessage('Street address is required.');
+      setErrorMessage('Street / Hall / Campus address is required.');
       return;
     }
     if (!shippingAddress.city.trim()) {
-      setErrorMessage('City is required.');
+      setErrorMessage('City / District is required.');
       return;
     }
     if (!shippingAddress.postalCode.trim()) {
-      setErrorMessage('Postal / ZIP code is required.');
+      setErrorMessage('Postal code is required.');
       return;
     }
-    if (!shippingAddress.country.trim()) {
-      setErrorMessage('Country is required.');
-      return;
+
+    if (destinationType === 'bangladesh') {
+      if (!shippingAddress.phone || shippingAddress.phone.trim().length < 11) {
+        setErrorMessage(
+          'Please enter a valid 11-digit Bangladeshi contact phone number (e.g. 017xxxxxxxx) for delivery couriers.'
+        );
+        return;
+      }
+
+      if (paymentMethod === 'bkash' || paymentMethod === 'nagad') {
+        if (!mfsNumber || mfsNumber.trim().length < 11) {
+          setErrorMessage(`Please enter your valid 11-digit ${paymentMethod === 'bkash' ? 'bKash' : 'Nagad'} mobile account number.`);
+          return;
+        }
+      }
     }
 
     try {
       setSubmitting(true);
+
+      // Generate a simulated Transaction ID (TrxID) for bKash or Nagad
+      let simulatedTrxId = null;
+      if (paymentMethod === 'bkash') {
+        simulatedTrxId = 'BK' + Math.random().toString(36).substring(2, 9).toUpperCase();
+      } else if (paymentMethod === 'nagad') {
+        simulatedTrxId = 'NG' + Math.random().toString(36).substring(2, 9).toUpperCase();
+      } else if (paymentMethod === 'card') {
+        simulatedTrxId = 'AUTH_' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      }
 
       // Format payload for backend transactional creation
       const payload = {
@@ -90,9 +199,32 @@ export const CheckoutPage = () => {
           quantity: item.quantity,
         })),
         shippingAddress: {
-          ...shippingAddress,
           recipientName: user?.name,
+          country: destinationType === 'bangladesh' ? 'Bangladesh' : shippingAddress.country,
+          division: destinationType === 'bangladesh' ? shippingAddress.division : shippingAddress.state,
+          city: shippingAddress.city,
+          street: shippingAddress.street,
+          postalCode: shippingAddress.postalCode,
+          phone: shippingAddress.phone,
+          deliveryInstructions: shippingAddress.deliveryInstructions,
           paymentMethod,
+          paymentDetails: {
+            methodName:
+              paymentMethod === 'bkash'
+                ? 'bKash'
+                : paymentMethod === 'nagad'
+                ? 'Nagad'
+                : paymentMethod === 'cod'
+                ? 'Cash on Delivery (COD)'
+                : 'Credit/Debit Card',
+            accountNumber:
+              paymentMethod === 'bkash' || paymentMethod === 'nagad'
+                ? mfsNumber
+                : paymentMethod === 'card'
+                ? cardDetails.cardNumber
+                : 'N/A',
+            trxId: simulatedTrxId,
+          },
         },
       };
 
@@ -102,7 +234,7 @@ export const CheckoutPage = () => {
       // 1. Wipe client-side cart from memory and localStorage
       clearCart();
 
-      // 2. Navigate to order confirmation
+      // 2. Navigate to order confirmation receipt
       navigate(`/order-success/${placedOrder.id}`, { replace: true });
     } catch (err) {
       console.error('Order placement failed:', err);
@@ -116,22 +248,30 @@ export const CheckoutPage = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 space-y-8">
-      {/* Title */}
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Checkout & Shipping
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Complete your delivery and payment details to place your order.
-        </p>
+      {/* Title & Localized Banner */}
+      <div className="border-b border-slate-200 pb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Checkout & Shipping
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Complete your delivery destination and select your payment method (bKash, Nagad, Cash on Delivery, or Card).
+          </p>
+        </div>
+
+        {/* Currency Rate Notice */}
+        <div className="px-3.5 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 self-start md:self-auto">
+          <span className="font-bold">Conversion Rate:</span>
+          <span>$1.00 USD = ৳120 BDT</span>
+        </div>
       </div>
 
       {/* Error Alert */}
       {errorMessage && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-3 text-xs text-rose-800">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-xs text-rose-800 animate-shake">
           <AlertCircle className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" />
           <div className="space-y-1">
-            <strong className="font-bold block">Order Placement Error</strong>
+            <strong className="font-bold block">Please check your information:</strong>
             <span>{errorMessage}</span>
           </div>
         </div>
@@ -141,8 +281,8 @@ export const CheckoutPage = () => {
       <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Delivery & Payment Details (2 cols) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Section 1: Customer Contact info */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          {/* Section 1: Customer Contact Info */}
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-4">
             <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
               <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
                 <CheckCircle2 className="w-4 h-4" />
@@ -157,7 +297,7 @@ export const CheckoutPage = () => {
                   type="text"
                   disabled
                   value={user?.name || ''}
-                  className="w-full px-3.5 py-2 border border-slate-200 bg-slate-50 rounded-xl text-slate-600 cursor-not-allowed"
+                  className="w-full px-3.5 py-2 border border-slate-200 bg-slate-50 rounded-xl text-slate-600 cursor-not-allowed font-medium"
                 />
               </div>
 
@@ -167,148 +307,345 @@ export const CheckoutPage = () => {
                   type="email"
                   disabled
                   value={user?.email || ''}
-                  className="w-full px-3.5 py-2 border border-slate-200 bg-slate-50 rounded-xl text-slate-600 cursor-not-allowed"
+                  className="w-full px-3.5 py-2 border border-slate-200 bg-slate-50 rounded-xl text-slate-600 cursor-not-allowed font-medium"
                 />
               </div>
             </div>
           </div>
 
           {/* Section 2: Shipping Destination Address */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                <MapPin className="w-4 h-4" />
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <h2 className="font-bold text-sm text-slate-900">2. Shipping Destination</h2>
               </div>
-              <h2 className="font-bold text-sm text-slate-900">2. Shipping Destination</h2>
+
+              {/* Destination Mode Selector */}
+              <div className="inline-flex p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDestinationType('bangladesh');
+                    setShippingAddress((prev) => ({ ...prev, country: 'Bangladesh' }));
+                  }}
+                  className={`px-3 py-1 rounded-lg transition ${
+                    destinationType === 'bangladesh'
+                      ? 'bg-white text-emerald-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Bangladesh 🇧🇩
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDestinationType('international');
+                    setShippingAddress((prev) => ({ ...prev, country: 'United States' }));
+                  }}
+                  className={`px-3 py-1 rounded-lg transition ${
+                    destinationType === 'international'
+                      ? 'bg-white text-emerald-700 shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  International 🌐
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Street Address <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  name="street"
-                  value={shippingAddress.street}
-                  onChange={handleInputChange}
-                  placeholder="e.g. 123 Market Street, Apt 4B"
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
-                />
-              </div>
+            {destinationType === 'bangladesh' ? (
+              <div className="space-y-4 text-xs">
+                {/* Quick Local Presets */}
+                <div className="space-y-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
+                  <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 uppercase tracking-wider">
+                    ⚡ Quick Fill Local Location:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {LOCAL_PRESETS.map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => applyLocalPreset(preset)}
+                        className="px-2.5 py-1 text-[11px] font-medium bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-slate-200 rounded-lg shadow-2xs transition"
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Division */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Division <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      name="division"
+                      value={shippingAddress.division}
+                      onChange={handleInputChange}
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm bg-white"
+                    >
+                      {BD_DIVISIONS.map((div) => (
+                        <option key={div} value={div}>
+                          {div} Division
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* District / City */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      District / City / Thana <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      name="city"
+                      value={shippingAddress.city}
+                      onChange={handleInputChange}
+                      placeholder="e.g. Dhaka, Savar, Gazipur, Chattogram"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Street / Campus / Hall Address */}
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    City <span className="text-rose-500">*</span>
+                    Street Address, Hall / Campus / House & Road <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    name="city"
-                    value={shippingAddress.city}
+                    name="street"
+                    value={shippingAddress.street}
                     onChange={handleInputChange}
-                    placeholder="San Francisco"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    placeholder="e.g. Al-Beruni Hall, Room 302, Jahangirnagar University, Savar"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
                   />
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Postal Code */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Postal Code <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      name="postalCode"
+                      value={shippingAddress.postalCode}
+                      onChange={handleInputChange}
+                      placeholder="e.g. 1342 (JU Savar), 1216 (Mirpur)"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    />
+                  </div>
+
+                  {/* Mobile Phone Number (Crucial for Bangladeshi Couriers) */}
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Courier Contact Number (Active Phone) <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">
+                        +88
+                      </span>
+                      <input
+                        type="tel"
+                        required
+                        name="phone"
+                        value={shippingAddress.phone}
+                        onChange={handleInputChange}
+                        placeholder="01712345678"
+                        className="w-full pl-12 pr-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm font-mono"
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Delivery riders from Pathao / Steadfast will call this number prior to arrival.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Delivery Instructions */}
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">State / Province</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Special Delivery Instructions (Optional)
+                  </label>
                   <input
                     type="text"
-                    name="state"
-                    value={shippingAddress.state}
+                    name="deliveryInstructions"
+                    value={shippingAddress.deliveryInstructions}
                     onChange={handleInputChange}
-                    placeholder="California"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    placeholder="e.g. Leave with security guard at campus main gate if unreachable."
+                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-xs"
                   />
                 </div>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            ) : (
+              /* International Form */
+              <div className="space-y-4 text-xs">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Postal / ZIP Code <span className="text-rose-500">*</span>
+                    Street Address <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    name="postalCode"
-                    value={shippingAddress.postalCode}
+                    name="street"
+                    value={shippingAddress.street}
                     onChange={handleInputChange}
-                    placeholder="94105"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    placeholder="123 Market Street, Apt 4B"
+                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Country <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    name="country"
-                    value={shippingAddress.country}
-                    onChange={handleInputChange}
-                    placeholder="United States"
-                    className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      City <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      name="city"
+                      value={shippingAddress.city}
+                      onChange={handleInputChange}
+                      placeholder="San Francisco"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">State / Province</label>
+                    <input
+                      type="text"
+                      name="state"
+                      value={shippingAddress.state}
+                      onChange={handleInputChange}
+                      placeholder="California"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Postal / ZIP Code <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      name="postalCode"
+                      value={shippingAddress.postalCode}
+                      onChange={handleInputChange}
+                      placeholder="94105"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Country <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      name="country"
+                      value={shippingAddress.country}
+                      onChange={handleInputChange}
+                      placeholder="United States"
+                      className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
+                    />
+                  </div>
                 </div>
               </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Phone Number (Optional)</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={shippingAddress.phone}
-                  onChange={handleInputChange}
-                  placeholder="+1 (555) 000-0000"
-                  className="w-full px-3.5 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition text-sm"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Section 3: Payment Method Simulator */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 shadow-sm space-y-5">
             <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
               <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
                 <CreditCard className="w-4 h-4" />
               </div>
-              <h2 className="font-bold text-sm text-slate-900">3. Payment Simulator</h2>
+              <div>
+                <h2 className="font-bold text-sm text-slate-900">3. Payment Method Simulator</h2>
+                <p className="text-[11px] text-slate-400">
+                  Select your preferred Bangladeshi or International payment option.
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Payment Method Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {/* bKash */}
               <label
-                className={`p-4 rounded-xl border cursor-pointer flex items-start gap-3 transition ${
-                  paymentMethod === 'card'
-                    ? 'border-emerald-500 bg-emerald-50/40 text-emerald-950 ring-1 ring-emerald-500'
+                className={`p-4 rounded-2xl border cursor-pointer flex items-start gap-3 transition relative ${
+                  paymentMethod === 'bkash'
+                    ? 'border-[#E2136E] bg-pink-50/40 text-slate-900 ring-2 ring-[#E2136E]/30'
                     : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
                 <input
                   type="radio"
                   name="payment"
-                  checked={paymentMethod === 'card'}
-                  onChange={() => setPaymentMethod('card')}
-                  className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  checked={paymentMethod === 'bkash'}
+                  onChange={() => setPaymentMethod('bkash')}
+                  className="mt-1 text-[#E2136E] focus:ring-[#E2136E]"
                 />
-                <div>
-                  <span className="font-bold text-xs block">Test Card Simulation</span>
-                  <span className="text-[11px] text-slate-500 block mt-0.5">
-                    Instant test authorization without real charges.
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-xs text-[#E2136E]">bKash (বিকাশ)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E2136E] text-white">
+                      MFS
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 block leading-tight">
+                    Instant mobile checkout with simulated TrxID confirmation.
                   </span>
                 </div>
               </label>
 
+              {/* Nagad */}
               <label
-                className={`p-4 rounded-xl border cursor-pointer flex items-start gap-3 transition ${
+                className={`p-4 rounded-2xl border cursor-pointer flex items-start gap-3 transition relative ${
+                  paymentMethod === 'nagad'
+                    ? 'border-[#F7941E] bg-amber-50/40 text-slate-900 ring-2 ring-[#F7941E]/30'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === 'nagad'}
+                  onChange={() => setPaymentMethod('nagad')}
+                  className="mt-1 text-[#F7941E] focus:ring-[#F7941E]"
+                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-xs text-[#F7941E]">Nagad (নগদ)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#F7941E] text-white">
+                      MFS
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 block leading-tight">
+                    Post Office digital financial service with simulated verification.
+                  </span>
+                </div>
+              </label>
+
+              {/* Cash on Delivery */}
+              <label
+                className={`p-4 rounded-2xl border cursor-pointer flex items-start gap-3 transition ${
                   paymentMethod === 'cod'
-                    ? 'border-emerald-500 bg-emerald-50/40 text-emerald-950 ring-1 ring-emerald-500'
+                    ? 'border-emerald-500 bg-emerald-50/40 text-emerald-950 ring-2 ring-emerald-500/30'
                     : 'border-slate-200 hover:bg-slate-50'
                 }`}
               >
@@ -317,74 +654,251 @@ export const CheckoutPage = () => {
                   name="payment"
                   checked={paymentMethod === 'cod'}
                   onChange={() => setPaymentMethod('cod')}
-                  className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
                 />
-                <div>
-                  <span className="font-bold text-xs block">Cash on Delivery</span>
-                  <span className="text-[11px] text-slate-500 block mt-0.5">
-                    Settle payment upon package handover.
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-slate-900">Cash on Delivery</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">
+                      COD
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 block leading-tight">
+                    Pay delivery rider in cash upon unboxing at your gate/hall.
+                  </span>
+                </div>
+              </label>
+
+              {/* Debit/Credit Card */}
+              <label
+                className={`p-4 rounded-2xl border cursor-pointer flex items-start gap-3 transition ${
+                  paymentMethod === 'card'
+                    ? 'border-blue-500 bg-blue-50/40 text-blue-950 ring-2 ring-blue-500/30'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === 'card'}
+                  onChange={() => setPaymentMethod('card')}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-slate-900">Visa / Mastercard</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                      Bank Card
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 block leading-tight">
+                    Simulated bank authorization for local and international cards.
                   </span>
                 </div>
               </label>
             </div>
+
+            {/* Dynamic Payment Details Inputs */}
+            {paymentMethod === 'bkash' && (
+              <div className="p-4 bg-pink-50/60 border border-pink-200 rounded-2xl space-y-3 animate-fadeIn text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#E2136E]">bKash Payment Gateway Simulation</span>
+                  <span className="text-[11px] text-pink-700 font-mono">
+                    Total: {formatBDT(grandTotal)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Your bKash Account Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={mfsNumber}
+                      onChange={(e) => setMfsNumber(e.target.value)}
+                      placeholder="017xxxxxxxx"
+                      className="w-full px-3 py-2 border border-pink-200 rounded-xl bg-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#E2136E]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Simulated 5-Digit PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={5}
+                      value={mfsPin}
+                      onChange={(e) => setMfsPin(e.target.value)}
+                      placeholder="•••••"
+                      className="w-full px-3 py-2 border border-pink-200 rounded-xl bg-white font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-[#E2136E]"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  🔒 Test mode active: Enter any valid 11-digit number. A simulated TrxID will be generated automatically upon placement.
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === 'nagad' && (
+              <div className="p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-3 animate-fadeIn text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#F7941E]">Nagad Payment Gateway Simulation</span>
+                  <span className="text-[11px] text-amber-800 font-mono">
+                    Total: {formatBDT(grandTotal)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Your Nagad Account Number
+                    </label>
+                    <input
+                      type="tel"
+                      value={mfsNumber}
+                      onChange={(e) => setMfsNumber(e.target.value)}
+                      placeholder="017xxxxxxxx"
+                      className="w-full px-3 py-2 border border-amber-200 rounded-xl bg-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#F7941E]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Simulated 4-Digit PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={4}
+                      value={mfsPin}
+                      onChange={(e) => setMfsPin(e.target.value)}
+                      placeholder="••••"
+                      className="w-full px-3 py-2 border border-amber-200 rounded-xl bg-white font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-[#F7941E]"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  🔒 Test mode active: Nagad will simulate authorization and generate a TrxID.
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === 'card' && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3 animate-fadeIn text-xs">
+                <span className="font-bold text-slate-800 block">Bank Card Simulation</span>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block font-semibold text-slate-600 mb-1">Card Number</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={cardDetails.cardNumber}
+                      className="w-full px-3 py-2 border border-slate-200 bg-white rounded-xl font-mono text-slate-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-600 mb-1">CVV</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={cardDetails.cvv}
+                      className="w-full px-3 py-2 border border-slate-200 bg-white rounded-xl font-mono text-slate-600"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'cod' && (
+              <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-2xl space-y-1.5 text-xs text-emerald-900 animate-fadeIn">
+                <span className="font-bold block">Cash on Delivery Notice:</span>
+                <p className="text-slate-600 leading-relaxed">
+                  Your order will be set to <strong className="text-emerald-700">Pending Cash Collection</strong>. You will pay the courier in cash upon receiving the package.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Column: Order Review & Submit (1 col) */}
         <div className="space-y-6">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5 sticky top-24">
-            <h2 className="font-bold text-base text-slate-900 border-b border-slate-100 pb-3">
-              Order Items ({cartItems.length})
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-5 sticky top-24">
+            <h2 className="font-bold text-base text-slate-900 border-b border-slate-100 pb-3 flex items-center justify-between">
+              <span>Order Items ({cartItems.length})</span>
+              <span className="text-xs font-semibold text-slate-400">BDT & USD</span>
             </h2>
 
             {/* Items Mini List */}
-            <div className="max-h-56 overflow-y-auto divide-y divide-slate-100 space-y-3 pr-1">
+            <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 space-y-3 pr-1">
               {cartItems.map((item) => (
                 <div key={item.id} className="pt-3 first:pt-0 flex items-center gap-3">
                   <img
                     src={item.imageUrl}
                     alt={item.name}
-                    className="w-12 h-12 rounded-lg object-cover bg-slate-100 border border-slate-200 flex-shrink-0"
+                    className="w-12 h-12 rounded-xl object-cover bg-slate-100 border border-slate-200 flex-shrink-0"
                     onError={(e) => {
                       e.target.onerror = null;
-                      e.target.src = 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=600&auto=format&fit=crop&q=80';
+                      e.target.src =
+                        'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=600&auto=format&fit=crop&q=80';
                     }}
                   />
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs font-bold text-slate-800 truncate">{item.name}</h4>
-                    <span className="text-[11px] text-slate-500">
-                      Qty: {item.quantity} × ${item.price.toFixed(2)}
+                    <span className="text-[11px] text-slate-500 font-mono">
+                      Qty: {item.quantity} × {formatBDT(item.price)}
                     </span>
                   </div>
-                  <span className="text-xs font-bold text-slate-900">
-                    ${(item.price * item.quantity).toFixed(2)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-slate-900 block">
+                      {formatBDT(item.price * item.quantity)}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {formatUSD(item.price * item.quantity)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Calculations Breakdown */}
+            {/* Calculations Breakdown in BDT & USD */}
             <div className="pt-3 border-t border-slate-100 space-y-2.5 text-xs">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal</span>
-                <span className="font-semibold text-slate-800">${subtotal.toFixed(2)}</span>
+                <span className="font-semibold text-slate-800">
+                  {formatBDT(subtotal)}{' '}
+                  <span className="text-[11px] text-slate-400">({formatUSD(subtotal)})</span>
+                </span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Shipping</span>
                 <span className="font-semibold text-slate-800">
-                  {shipping === 0 ? <span className="text-emerald-600 font-bold">FREE</span> : `$${shipping.toFixed(2)}`}
+                  {shipping === 0 ? (
+                    <span className="text-emerald-600 font-bold">FREE DELIVERY</span>
+                  ) : (
+                    <>
+                      {formatBDT(shipping)}{' '}
+                      <span className="text-[11px] text-slate-400">({formatUSD(shipping)})</span>
+                    </>
+                  )}
                 </span>
               </div>
               <div className="flex justify-between text-slate-600">
                 <span>Estimated Tax (8%)</span>
-                <span className="font-semibold text-slate-800">${estimatedTax.toFixed(2)}</span>
+                <span className="font-semibold text-slate-800">
+                  {formatBDT(estimatedTax)}{' '}
+                  <span className="text-[11px] text-slate-400">({formatUSD(estimatedTax)})</span>
+                </span>
               </div>
 
-              <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline text-sm">
-                <span className="font-bold text-slate-900">Grand Total</span>
-                <span className="text-2xl font-extrabold text-slate-900">
-                  ${grandTotal.toFixed(2)}
-                </span>
+              <div className="pt-3 border-t border-slate-200 space-y-1">
+                <div className="flex justify-between items-baseline">
+                  <span className="font-bold text-slate-900 text-sm">Grand Total (BDT)</span>
+                  <span className="text-2xl font-extrabold text-emerald-700">
+                    {formatBDT(grandTotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Equivalent in USD:</span>
+                  <span className="font-medium text-slate-600">{formatUSD(grandTotal)}</span>
+                </div>
               </div>
             </div>
 
@@ -400,7 +914,7 @@ export const CheckoutPage = () => {
                 </>
               ) : (
                 <>
-                  Confirm & Place Order
+                  Confirm & Place Order ({formatBDT(grandTotal)})
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

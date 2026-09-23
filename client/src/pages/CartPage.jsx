@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   RotateCcw,
 } from 'lucide-react';
+import { formatBDT, formatUSD } from '../utils/currency';
 
 export const CartPage = () => {
   const {
@@ -131,9 +132,12 @@ export const CartPage = () => {
                   </div>
 
                   {/* Line Total */}
-                  <div className="text-right min-w-[70px]">
-                    <span className="text-sm font-extrabold text-slate-900 block">
-                      ${(item.price * item.quantity).toFixed(2)}
+                  <div className="text-right min-w-[80px]">
+                    <span className="text-sm font-extrabold text-slate-900 block leading-tight">
+                      {formatBDT(item.price * item.quantity)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {formatUSD(item.price * item.quantity)}
                     </span>
                   </div>
 
@@ -169,7 +173,10 @@ export const CartPage = () => {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between text-slate-600">
                 <span>Subtotal ({itemCount} units)</span>
-                <span className="font-semibold text-slate-900">${subtotal.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">
+                  {formatBDT(subtotal)}{' '}
+                  <span className="text-xs text-slate-400 font-mono">({formatUSD(subtotal)})</span>
+                </span>
               </div>
 
               <div className="flex justify-between text-slate-600">
@@ -181,20 +188,26 @@ export const CartPage = () => {
                   {shipping === 0 ? (
                     <span className="text-emerald-600 uppercase text-xs font-bold">Free</span>
                   ) : (
-                    `$${shipping.toFixed(2)}`
+                    <>
+                      {formatBDT(shipping)}{' '}
+                      <span className="text-xs text-slate-400 font-mono">({formatUSD(shipping)})</span>
+                    </>
                   )}
                 </span>
               </div>
 
               <div className="flex justify-between text-slate-600">
                 <span>Estimated Tax (8%)</span>
-                <span className="font-semibold text-slate-900">${estimatedTax.toFixed(2)}</span>
+                <span className="font-semibold text-slate-900">
+                  {formatBDT(estimatedTax)}{' '}
+                  <span className="text-xs text-slate-400 font-mono">({formatUSD(estimatedTax)})</span>
+                </span>
               </div>
 
               <div className="pt-3 border-t border-slate-200 flex justify-between items-baseline">
-                <span className="text-base font-bold text-slate-900">Order Total</span>
-                <span className="text-2xl font-extrabold text-slate-900">
-                  ${grandTotal.toFixed(2)}
+                <span className="text-base font-bold text-slate-900">Order Total (BDT)</span>
+                <span className="text-2xl font-extrabold text-emerald-700">
+                  {formatBDT(grandTotal)}
                 </span>
               </div>
             </div>

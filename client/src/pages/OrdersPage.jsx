@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
+import { formatBDT, formatUSD } from '../utils/currency';
 import {
   Package,
   Calendar,
@@ -11,6 +12,8 @@ import {
   RefreshCw,
   ShoppingBag,
   AlertCircle,
+  CreditCard,
+  MapPin,
 } from 'lucide-react';
 
 export const OrdersPage = () => {
@@ -36,7 +39,7 @@ export const OrdersPage = () => {
     fetchOrders();
   }, []);
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, paymentMethod) => {
     switch (status) {
       case 'PAID':
         return (
@@ -45,11 +48,18 @@ export const OrdersPage = () => {
             Paid & Confirmed
           </span>
         );
+      case 'PENDING':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            {paymentMethod === 'cod' ? 'Cash on Delivery (Pending)' : 'Payment Processing'}
+          </span>
+        );
       case 'SHIPPED':
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
             <Truck className="w-3.5 h-3.5 text-blue-600" />
-            Shipped
+            Dispatched / In Transit
           </span>
         );
       case 'DELIVERED':
@@ -61,11 +71,19 @@ export const OrdersPage = () => {
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
+            <Clock className="w-3.5 h-3.5 text-slate-500" />
             {status}
           </span>
         );
+    }
+  };
+
+  const parseOrderAddress = (rawAddress) => {
+    try {
+      return typeof rawAddress === 'string' ? JSON.parse(rawAddress) : rawAddress || {};
+    } catch {
+      return { street: rawAddress };
     }
   };
 
@@ -80,7 +98,7 @@ export const OrdersPage = () => {
 
   if (error) {
     return (
-      <div className="max-w-md mx-auto my-20 p-8 bg-white border border-rose-200 rounded-2xl text-center space-y-4 shadow-sm">
+      <div className="max-w-md mx-auto my-20 p-8 bg-white border border-rose-200 rounded-3xl text-center space-y-4 shadow-sm">
         <AlertCircle className="w-10 h-10 text-rose-600 mx-auto" />
         <h2 className="text-lg font-bold text-slate-900">Error Loading Orders</h2>
         <p className="text-xs text-rose-700">{error}</p>
@@ -97,7 +115,7 @@ export const OrdersPage = () => {
             Order History
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Track your previous purchases and view transaction receipts.
+            Track your deliveries across Bangladesh and view your verified receipts.
           </p>
         </div>
 
@@ -115,7 +133,7 @@ export const OrdersPage = () => {
           <div className="space-y-1">
             <h3 className="font-bold text-slate-900 text-lg">No Orders Placed Yet</h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              Once you checkout and purchase products, your order history and tracking will appear here.
+              Once you checkout and purchase products, your order history, delivery tracking, and bKash/Nagad receipts will appear here.
             </p>
           </div>
           <Link
@@ -128,77 +146,130 @@ export const OrdersPage = () => {
         </div>
       ) : (
         <div className="space-y-5">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition space-y-4"
-            >
-              {/* Order Card Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-3">
-                    <span className="font-extrabold text-slate-900 text-base">
-                      Order #{order.id}
+          {orders.map((order) => {
+            const address = parseOrderAddress(order.shippingAddress);
+            const paymentMethod = address.paymentMethod || 'card';
+            const paymentDetails = address.paymentDetails || {};
+
+            return (
+              <div
+                key={order.id}
+                className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition space-y-4"
+              >
+                {/* Order Card Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="space-y-1.5">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="font-extrabold text-slate-900 text-base">
+                        Order #{order.id}
+                      </span>
+                      {getStatusBadge(order.status, paymentMethod)}
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          paymentMethod === 'bkash'
+                            ? 'bg-pink-100 text-[#E2136E]'
+                            : paymentMethod === 'nagad'
+                            ? 'bg-amber-100 text-[#F7941E]'
+                            : paymentMethod === 'cod'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {paymentDetails.methodName || paymentMethod.toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Placed on {new Date(order.createdAt).toLocaleDateString()} at{' '}
+                      {new Date(order.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
-                    {getStatusBadge(order.status)}
                   </div>
-                  <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Placed on {new Date(order.createdAt).toLocaleDateString()} at{' '}
-                    {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+
+                  <div className="text-left sm:text-right">
+                    <span className="text-xs text-slate-400 block font-medium">Total Paid</span>
+                    <span className="text-lg font-extrabold text-emerald-700 block">
+                      {formatBDT(order.totalAmount)}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      {formatUSD(order.totalAmount)}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="text-left sm:text-right">
-                  <span className="text-xs text-slate-400 block font-medium">Total Paid</span>
-                  <span className="text-lg font-extrabold text-slate-900">
-                    ${order.totalAmount.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Items Preview */}
-              <div className="divide-y divide-slate-100 space-y-2">
-                {order.items?.map((item) => (
-                  <div key={item.id} className="pt-2 first:pt-0 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={item.product?.imageUrl}
-                        alt={item.product?.name}
-                        className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-200 flex-shrink-0"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=600&auto=format&fit=crop&q=80';
-                        }}
-                      />
-                      <div className="min-w-0">
-                        <span className="font-bold text-slate-800 block truncate">
-                          {item.product?.name || `Product #${item.productId}`}
+                {/* Delivery Snapshot */}
+                {address.street && (
+                  <div className="text-xs text-slate-600 bg-slate-50 p-3 rounded-2xl border border-slate-200/60 flex items-start gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <div className="truncate">
+                      <span className="font-semibold text-slate-800">Delivering to: </span>
+                      <span>
+                        {address.street}, {address.city}
+                        {address.division ? `, ${address.division}` : ''}
+                      </span>
+                      {address.phone && (
+                        <span className="text-slate-500 font-mono ml-2">
+                          (📞 +88 {address.phone})
                         </span>
-                        <span className="text-slate-500 font-mono text-[11px]">
-                          Qty: {item.quantity} × ${item.unitPrice.toFixed(2)}
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Items Preview */}
+                <div className="divide-y divide-slate-100 space-y-2">
+                  {order.items?.map((item) => (
+                    <div
+                      key={item.id}
+                      className="pt-2 first:pt-0 flex items-center justify-between text-xs"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={item.product?.imageUrl}
+                          alt={item.product?.name}
+                          className="w-10 h-10 rounded-lg object-cover bg-slate-100 border border-slate-200 flex-shrink-0"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src =
+                              'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=600&auto=format&fit=crop&q=80';
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <span className="font-bold text-slate-800 block truncate">
+                            {item.product?.name || `Product #${item.productId}`}
+                          </span>
+                          <span className="text-slate-500 font-mono text-[11px]">
+                            Qty: {item.quantity} × {formatBDT(item.unitPrice)} ({formatUSD(item.unitPrice)})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-bold text-slate-900 block whitespace-nowrap">
+                          {formatBDT(item.quantity * item.unitPrice)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          {formatUSD(item.quantity * item.unitPrice)}
                         </span>
                       </div>
                     </div>
-                    <span className="font-bold text-slate-900 whitespace-nowrap">
-                      ${(item.quantity * item.unitPrice).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
 
-              {/* Order Footer Link */}
-              <div className="pt-3 border-t border-slate-100 flex justify-end">
-                <Link
-                  to={`/order-success/${order.id}`}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition"
-                >
-                  View Full Receipt & Delivery Details
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                {/* Order Footer Link */}
+                <div className="pt-3 border-t border-slate-100 flex justify-end">
+                  <Link
+                    to={`/order-success/${order.id}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition"
+                  >
+                    View Full Receipt & Delivery Details
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

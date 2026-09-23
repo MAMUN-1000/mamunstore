@@ -74,11 +74,14 @@ export const createOrder = async ({ userId, items, shippingAddress }) => {
     }
 
     // 4. Create the Order with nested OrderItems
+    const paymentMethod = typeof shippingAddress === 'object' ? shippingAddress?.paymentMethod : 'card';
+    const initialStatus = paymentMethod === 'cod' ? 'PENDING' : 'PAID';
+
     const order = await tx.order.create({
       data: {
         userId,
         totalAmount,
-        status: 'PAID', // Payment is verified/settled in this checkout flow
+        status: initialStatus, // COD starts as PENDING until courier delivery, MFS/Card are PAID
         shippingAddress: typeof shippingAddress === 'string' ? shippingAddress : JSON.stringify(shippingAddress),
         items: {
           create: verifiedItems.map((item) => ({

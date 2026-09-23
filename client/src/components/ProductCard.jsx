@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { Eye, CheckCircle2, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { formatBDT } from '../utils/currency';
 
 export const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
@@ -57,8 +58,11 @@ export const ProductCard = ({ product }) => {
         {/* Price & Action */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
           <div>
-            <span className="text-xs text-slate-400 font-medium block">Price</span>
-            <span className="text-lg font-extrabold text-slate-900">
+            <span className="text-[11px] text-slate-400 font-medium block">Price</span>
+            <span className="text-base font-extrabold text-slate-900 block leading-tight">
+              {formatBDT(product.price)}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">
               ${product.price.toFixed(2)}
             </span>
           </div>

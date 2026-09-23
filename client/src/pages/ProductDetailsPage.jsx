@@ -14,6 +14,7 @@ import {
   Minus,
   MessageSquare,
 } from 'lucide-react';
+import { formatBDT, formatUSD } from '../utils/currency';
 
 export const ProductDetailsPage = () => {
   const { id } = useParams();
@@ -127,18 +128,21 @@ export const ProductDetailsPage = () => {
             </h1>
 
             {/* Price & Stock Header */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-baseline gap-3">
               <span className="text-3xl font-extrabold text-slate-900">
-                ${product.price.toFixed(2)}
+                {formatBDT(product.price)}
+              </span>
+              <span className="text-sm font-semibold text-slate-400 font-mono">
+                (${product.price.toFixed(2)})
               </span>
 
               {product.stock > 0 ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 ml-auto sm:ml-0">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                   In Stock ({product.stock} units available)
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200 ml-auto sm:ml-0">
                   <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
                   Currently Out of Stock
                 </span>
@@ -191,7 +195,7 @@ export const ProductDetailsPage = () => {
                   className="w-full py-3.5 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 group"
                 >
                   <ShoppingBag className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  Add {quantity} to Cart (${(product.price * quantity).toFixed(2)})
+                  Add {quantity} to Cart ({formatBDT(product.price * quantity)})
                 </button>
               </div>
             ) : (
