@@ -96,8 +96,18 @@ export const Footer = () => {
           </h4>
           <ul className="space-y-2">
             <li>
-              <Link to="/products" className="hover:text-emerald-600 transition">
-                Help & FAQ Center
+              <Link to="/help" className="hover:text-emerald-600 transition">
+                Help &amp; Support Center
+              </Link>
+            </li>
+            <li>
+              <Link to="/customer-care" className="hover:text-emerald-600 transition">
+                Contact Customer Care Desk
+              </Link>
+            </li>
+            <li>
+              <Link to="/faq" className="hover:text-emerald-600 transition">
+                Frequently Asked Questions
               </Link>
             </li>
             <li>
@@ -106,19 +116,14 @@ export const Footer = () => {
               </Link>
             </li>
             <li>
-              <span className="text-slate-400 cursor-not-allowed">
-                7-Day Easy Return Policy
-              </span>
+              <Link to="/help?category=returns" className="hover:text-emerald-600 transition">
+                Return &amp; Damage Assistance
+              </Link>
             </li>
             <li>
-              <span className="text-slate-400 cursor-not-allowed">
-                Delivery & Shipping Rates
-              </span>
-            </li>
-            <li>
-              <span className="text-slate-400 cursor-not-allowed">
-                Warranty & Authenticity
-              </span>
+              <Link to="/help?category=delivery" className="hover:text-emerald-600 transition">
+                JU Campus Delivery Rates
+              </Link>
             </li>
           </ul>
         </div>

@@ -52,15 +52,21 @@ export const HomePage = () => {
         setBudgetDeals(dealsRes.data.data.products || []);
 
         // Filter / sort for top-rated customer favorites
+        // Data Rule: Prioritize verified top-rated products (averageRating >= 4.0),
+        // gracefully falling back to any rated products (averageRating > 0) or flagship items if few reviews exist yet.
         const allProds = allRes.data.data.products || [];
-        const ratedProds = allProds
-          .filter((p) => p.averageRating > 0 || p.reviewCount > 0)
-          .sort((a, b) => b.averageRating - a.averageRating)
-          .slice(0, 4);
+        const highRated = allProds
+          .filter((p) => p.averageRating >= 4.0)
+          .sort((a, b) => b.averageRating - a.averageRating);
 
-        // If no products have reviews yet, take the first 4 products with price > $50 as flagship items
-        if (ratedProds.length > 0) {
-          setTopRated(ratedProds);
+        const anyRated = allProds
+          .filter((p) => p.averageRating > 0 || p.reviewCount > 0)
+          .sort((a, b) => b.averageRating - a.averageRating);
+
+        if (highRated.length >= 4) {
+          setTopRated(highRated.slice(0, 4));
+        } else if (anyRated.length > 0) {
+          setTopRated(anyRated.slice(0, 4));
         } else {
           setTopRated(allProds.slice(2, 6));
         }

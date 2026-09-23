@@ -15,6 +15,10 @@ import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import OrdersPage from './pages/OrdersPage';
+import HelpCenterPage from './pages/HelpCenterPage';
+import CustomerCarePage from './pages/CustomerCarePage';
+import FaqPage from './pages/FaqPage';
+import FaqChatbot from './components/FaqChatbot';
 
 function App() {
   return (
@@ -24,6 +28,9 @@ function App() {
 
       {/* Slide-over Cart Drawer */}
       <CartDrawer />
+
+      {/* Floating FAQ Knowledge-Base Chatbot Widget */}
+      <FaqChatbot />
 
       {/* Main Routed Page Content */}
       <main className="flex-1">
@@ -35,6 +42,9 @@ function App() {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/help" element={<HelpCenterPage />} />
+          <Route path="/customer-care" element={<CustomerCarePage />} />
+          <Route path="/faq" element={<FaqPage />} />
 
           {/* Protected Customer Routes */}
           <Route
