@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useWishlist } from '../context/WishlistContext';
 import { formatBDT, formatUSD } from '../utils/currency';
 import StarRating from '../components/StarRating';
 import ReviewForm from '../components/ReviewForm';
@@ -21,6 +22,7 @@ import {
   Trash2,
   Lock,
   Edit3,
+  Heart,
 } from 'lucide-react';
 
 export const ProductDetailsPage = () => {
@@ -28,6 +30,7 @@ export const ProductDetailsPage = () => {
   const navigate = useNavigate();
   const { addToCart } = useCart();
   const { user } = useAuth();
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -298,6 +301,23 @@ export const ProductDetailsPage = () => {
                 Item Unavailable
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => toggleWishlist(product)}
+              className={`w-full py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border cursor-pointer ${
+                isInWishlist(product.id)
+                  ? 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'
+                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Heart
+                className={`w-4 h-4 ${
+                  isInWishlist(product.id) ? 'fill-current text-rose-500' : 'text-slate-400'
+                }`}
+              />
+              <span>{isInWishlist(product.id) ? 'Saved in Wishlist' : 'Add to Wishlist'}</span>
+            </button>
 
             <button
               onClick={() => navigate('/products')}

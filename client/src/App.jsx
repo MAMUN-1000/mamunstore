@@ -20,6 +20,7 @@ import HelpCenterPage from './pages/HelpCenterPage';
 import CustomerCarePage from './pages/CustomerCarePage';
 import FaqPage from './pages/FaqPage';
 import FaqChatbot from './components/FaqChatbot';
+import WishlistPage from './pages/WishlistPage';
 
 function App() {
   return (
@@ -85,6 +86,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wishlist"
+            element={
+              <ProtectedRoute>
+                <WishlistPage />
               </ProtectedRoute>
             }
           />

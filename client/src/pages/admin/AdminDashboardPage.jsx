@@ -5,6 +5,7 @@ import { formatBDT, formatUSD } from '../../utils/currency';
 import ProductModal from '../../components/admin/ProductModal';
 import OrderDetailModal from '../../components/admin/OrderDetailModal';
 import ReturnDetailModal from '../../components/admin/ReturnDetailModal';
+import CouponModal from '../../components/admin/CouponModal';
 import {
   ShieldCheck,
   RefreshCw,
@@ -24,6 +25,7 @@ import {
   Search,
   Filter,
   RotateCcw,
+  Tag,
 } from 'lucide-react';
 
 export const AdminDashboardPage = () => {
@@ -53,6 +55,10 @@ export const AdminDashboardPage = () => {
   const [returnsLoading, setReturnsLoading] = useState(false);
   const [returnStatusFilter, setReturnStatusFilter] = useState('ALL');
 
+  // Coupons Data
+  const [coupons, setCoupons] = useState([]);
+  const [couponsLoading, setCouponsLoading] = useState(false);
+
   // Modals State
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -60,6 +66,8 @@ export const AdminDashboardPage = () => {
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState(null);
   const [returnModalOpen, setReturnModalOpen] = useState(false);
+  const [couponModalOpen, setCouponModalOpen] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState(null);
 
   // Error & Status Messages
   const [globalError, setGlobalError] = useState(null);
@@ -143,6 +151,48 @@ export const AdminDashboardPage = () => {
     }
   }, [returnStatusFilter]);
 
+  // 6. Fetch Coupons
+  const fetchCoupons = useCallback(async () => {
+    try {
+      setCouponsLoading(true);
+      const res = await axiosInstance.get('/coupons/admin/all');
+      setCoupons(res.data.data.coupons || []);
+    } catch (err) {
+      console.error('Failed to load coupons for admin:', err);
+    } finally {
+      setCouponsLoading(false);
+    }
+  }, []);
+
+  const handleToggleCouponActive = async (id) => {
+    try {
+      await axiosInstance.patch(`/coupons/admin/${id}/toggle`);
+      fetchCoupons();
+    } catch (err) {
+      console.error('Failed to toggle coupon status:', err);
+      alert(err.response?.data?.message || 'Failed to toggle coupon status.');
+    }
+  };
+
+  const handleDeleteCoupon = async (id, code) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete coupon "${code}"? If it has prior order usages, it will be safely deactivated.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await axiosInstance.delete(`/coupons/admin/${id}`);
+      alert(res.data.message || 'Coupon removed.');
+      fetchCoupons();
+    } catch (err) {
+      console.error('Failed to delete coupon:', err);
+      alert(err.response?.data?.message || 'Failed to delete coupon.');
+    }
+  };
+
   // Initial Data Load
   useEffect(() => {
     fetchMetrics();
@@ -156,8 +206,10 @@ export const AdminDashboardPage = () => {
       fetchOrders();
     } else if (activeTab === 'returns') {
       fetchReturns();
+    } else if (activeTab === 'coupons') {
+      fetchCoupons();
     }
-  }, [activeTab, fetchProducts, fetchOrders, fetchReturns]);
+  }, [activeTab, fetchProducts, fetchOrders, fetchReturns, fetchCoupons]);
 
   // Product Delete Handler
   const handleDeleteProduct = async (product) => {
@@ -372,6 +424,18 @@ export const AdminDashboardPage = () => {
         >
           <RotateCcw className="w-4 h-4" />
           Returns &amp; Refunds
+        </button>
+
+        <button
+          onClick={() => setActiveTab('coupons')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition cursor-pointer ${
+            activeTab === 'coupons'
+              ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+          }`}
+        >
+          <Tag className="w-4 h-4" />
+          Coupons &amp; Discounts ({coupons.length})
         </button>
       </div>
 
@@ -1022,6 +1086,174 @@ export const AdminDashboardPage = () => {
         </div>
       )}
 
+      {/* ======================================================== */}
+      {/* TAB 5: COUPONS & DISCOUNTS */}
+      {/* ======================================================== */}
+      {activeTab === 'coupons' && (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="font-extrabold text-lg text-slate-900">
+                Discount Coupons &amp; Promotions
+              </h2>
+              <p className="text-xs text-slate-500">
+                Create promotional discount codes (percentage or fixed BDT), set minimum orders, expiry dates, and usage limits.
+              </p>
+            </div>
+
+            <button
+              onClick={() => {
+                setEditingCoupon(null);
+                setCouponModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-sm transition self-start sm:self-auto cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Coupon</span>
+            </button>
+          </div>
+
+          {/* Coupons Table */}
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+            {couponsLoading ? (
+              <div className="p-16 text-center text-slate-400 space-y-3">
+                <RefreshCw className="w-8 h-8 mx-auto animate-spin text-purple-600" />
+                <p className="text-xs font-medium">Loading promotional coupons...</p>
+              </div>
+            ) : coupons.length === 0 ? (
+              <div className="p-16 text-center text-slate-400 space-y-3">
+                <Tag className="w-12 h-12 mx-auto stroke-1" />
+                <h3 className="font-bold text-sm text-slate-800">No Coupons Created Yet</h3>
+                <p className="text-xs max-w-sm mx-auto">
+                  Click the "Create Coupon" button to offer percentage or fixed discounts to your customers.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                      <th className="py-3 px-4">Coupon Code</th>
+                      <th className="py-3 px-4">Type &amp; Discount</th>
+                      <th className="py-3 px-4">Min. Order / Cap</th>
+                      <th className="py-3 px-4">Valid Period</th>
+                      <th className="py-3 px-4">Usage Limits</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                    {coupons.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-50/60 transition">
+                        <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                          <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg">
+                            {c.code}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-slate-800 block">
+                            {c.discountType === 'PERCENTAGE'
+                              ? `${c.discountValue}% OFF`
+                              : `${formatBDT(c.discountValue)} OFF`}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {c.discountType === 'PERCENTAGE' ? 'Percentage' : 'Fixed Amount'}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600">
+                          {c.minOrderAmount ? (
+                            <span className="block font-medium">Min: {formatBDT(c.minOrderAmount)}</span>
+                          ) : (
+                            <span className="block text-slate-400">No minimum</span>
+                          )}
+                          {c.maxDiscount && (
+                            <span className="text-[10px] text-slate-400 block font-mono">
+                              Cap: {formatBDT(c.maxDiscount)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600">
+                          {c.startDate || c.expiryDate ? (
+                            <div className="space-y-0.5 text-[11px]">
+                              {c.startDate && (
+                                <span className="block text-slate-500">
+                                  From: {new Date(c.startDate).toLocaleDateString()}
+                                </span>
+                              )}
+                              {c.expiryDate ? (
+                                <span
+                                  className={`block font-semibold ${
+                                    new Date(c.expiryDate) < new Date()
+                                      ? 'text-rose-600'
+                                      : 'text-slate-600'
+                                  }`}
+                                >
+                                  Expires: {new Date(c.expiryDate).toLocaleDateString()}
+                                  {new Date(c.expiryDate) < new Date() && ' (Expired)'}
+                                </span>
+                              ) : (
+                                <span className="block text-slate-400">No expiry</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">Always Active</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="block font-bold text-slate-800">
+                            {c.usedCount} / {c.usageLimit ?? '∞'} uses
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {c.perUserLimit ?? 1} per customer
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCouponActive(c.id)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition cursor-pointer ${
+                              c.isActive
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                c.isActive ? 'bg-emerald-500' : 'bg-slate-400'
+                              }`}
+                            />
+                            {c.isActive ? 'Active' : 'Disabled'}
+                          </button>
+                        </td>
+                        <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                          <button
+                            onClick={() => {
+                              setEditingCoupon(c);
+                              setCouponModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition cursor-pointer"
+                            title="Edit Coupon"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCoupon(c.id, c.code)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                            title="Delete / Deactivate Coupon"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Product Modal (Create & Edit) */}
       <ProductModal
         isOpen={productModalOpen}
@@ -1054,6 +1286,16 @@ export const AdminDashboardPage = () => {
         onUpdated={() => {
           fetchReturns();
           fetchMetrics();
+        }}
+      />
+
+      {/* Coupon Modal (Create & Edit) */}
+      <CouponModal
+        isOpen={couponModalOpen}
+        onClose={() => setCouponModalOpen(false)}
+        editingCoupon={editingCoupon}
+        onSuccess={() => {
+          fetchCoupons();
         }}
       />
     </div>

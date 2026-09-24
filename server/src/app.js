@@ -10,6 +10,9 @@ import orderRoutes from './routes/order.routes.js';
 import returnRoutes from './routes/return.routes.js';
 import reviewRoutes from './routes/review.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import wishlistRoutes from './routes/wishlist.routes.js';
+import couponRoutes from './routes/coupon.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 
 const app = express();
 
@@ -107,6 +110,15 @@ app.use('/api', reviewRoutes);
 
 // Admin Routes
 app.use('/api/admin', adminRoutes);
+
+// Wishlist Routes
+app.use('/api/wishlist', wishlistRoutes);
+
+// Coupon & Discount Routes
+app.use('/api/coupons', couponRoutes);
+
+// In-App Notification Routes
+app.use('/api/notifications', notificationRoutes);
 
 // 404 Handler for any unknown routes
 app.use((req, res, next) => {

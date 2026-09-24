@@ -1,11 +1,23 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { ShoppingBag, User, LogOut, ShieldCheck, LogIn, UserPlus, ShoppingCart } from 'lucide-react';
+import { useWishlist } from '../context/WishlistContext';
+import NotificationDropdown from './NotificationDropdown';
+import {
+  ShoppingBag,
+  User,
+  LogOut,
+  ShieldCheck,
+  LogIn,
+  UserPlus,
+  ShoppingCart,
+  Heart,
+} from 'lucide-react';
 
 export const Navbar = () => {
   const { user, logout, loading, isAdmin } = useAuth();
   const { itemCount, toggleCart } = useCart();
+  const { wishlistCount } = useWishlist();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -71,11 +83,27 @@ export const Navbar = () => {
         </nav>
 
         {/* Right / Auth & Cart Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Wishlist Link */}
+          {user && (
+            <Link
+              to="/wishlist"
+              className="relative p-2 rounded-xl text-slate-700 hover:text-rose-600 hover:bg-rose-50 transition"
+              title="My Wishlist"
+            >
+              <Heart className="w-5 h-5" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-rose-500 text-white font-bold text-[11px] flex items-center justify-center shadow-sm">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+          )}
+
           {/* Cart Drawer Trigger */}
           <button
             onClick={toggleCart}
-            className="relative p-2 rounded-xl text-slate-700 hover:text-emerald-600 hover:bg-slate-100 transition mr-1"
+            className="relative p-2 rounded-xl text-slate-700 hover:text-emerald-600 hover:bg-slate-100 transition"
             title="Open Shopping Cart"
           >
             <ShoppingCart className="w-5 h-5" />
@@ -86,11 +114,14 @@ export const Navbar = () => {
             )}
           </button>
 
+          {/* Notifications Dropdown */}
+          {user && <NotificationDropdown />}
+
           {loading ? (
-            <div className="w-20 h-8 bg-slate-100 animate-pulse rounded-lg" />
+            <div className="w-20 h-8 bg-slate-100 animate-pulse rounded-lg ml-2" />
           ) : user ? (
             // Logged In Controls
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 ml-1">
               <Link
                 to="/profile"
                 className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"

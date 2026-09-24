@@ -6,7 +6,7 @@ import * as orderService from '../services/order.service.js';
  */
 export const createOrder = async (req, res, next) => {
   try {
-    const { items, shippingAddress } = req.body;
+    const { items, shippingAddress, couponCode } = req.body;
 
     // Manual Validation
     if (!shippingAddress || typeof shippingAddress !== 'object') {
@@ -35,6 +35,7 @@ export const createOrder = async (req, res, next) => {
       userId: req.user.id,
       items,
       shippingAddress,
+      couponCode,
     });
 
     return res.status(201).json({

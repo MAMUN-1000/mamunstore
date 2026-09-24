@@ -19,6 +19,7 @@ import {
   Smartphone,
   Building,
   HelpCircle,
+  Tag,
 } from 'lucide-react';
 
 const BD_DIVISIONS = [
@@ -107,6 +108,57 @@ export const CheckoutPage = () => {
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+
+  // Coupon State
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponError, setCouponError] = useState(null);
+  const [couponSuccessMessage, setCouponSuccessMessage] = useState(null);
+
+  const handleApplyCoupon = async (e) => {
+    if (e) e.preventDefault();
+    if (!couponInput.trim()) return;
+
+    try {
+      setCouponValidating(true);
+      setCouponError(null);
+      setCouponSuccessMessage(null);
+
+      const res = await axiosInstance.post('/coupons/validate', {
+        code: couponInput.trim(),
+        items: cartItems.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+        })),
+      });
+
+      const couponData = res.data.data;
+      setAppliedCoupon(couponData);
+      setCouponSuccessMessage(
+        `Coupon "${couponData.coupon.code}" applied! You save ${formatBDT(couponData.discountAmount)}.`
+      );
+    } catch (err) {
+      console.error('Coupon validation failed:', err);
+      setAppliedCoupon(null);
+      setCouponError(err.response?.data?.message || 'Invalid coupon code.');
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError(null);
+    setCouponSuccessMessage(null);
+  };
+
+  // Recalculate totals taking into account coupon discount
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  const effectiveTax = discountedSubtotal * 0.08;
+  const finalGrandTotal = discountedSubtotal + shipping + effectiveTax;
 
   // If cart is empty, prompt user to add items first
   if (cartItems.length === 0) {
@@ -198,6 +250,7 @@ export const CheckoutPage = () => {
           productId: item.id,
           quantity: item.quantity,
         })),
+        couponCode: appliedCoupon ? appliedCoupon.coupon.code : null,
         shippingAddress: {
           recipientName: user?.name,
           country: destinationType === 'bangladesh' ? 'Bangladesh' : shippingAddress.country,
@@ -858,6 +911,79 @@ export const CheckoutPage = () => {
               ))}
             </div>
 
+            {/* Promo / Coupon Section */}
+            <div className="pt-3 border-t border-slate-100 space-y-2">
+              <label className="block text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                Have a Promo / Coupon Code?
+              </label>
+
+              {appliedCoupon ? (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <div>
+                      <span className="font-bold text-xs text-emerald-900 block font-mono">
+                        {appliedCoupon.coupon.code}
+                      </span>
+                      <span className="text-[11px] text-emerald-700">
+                        {appliedCoupon.coupon.discountType === 'PERCENTAGE'
+                          ? `${appliedCoupon.coupon.discountValue}% discount applied`
+                          : `${formatBDT(appliedCoupon.coupon.discountValue)} discount applied`}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value.toUpperCase());
+                        setCouponError(null);
+                      }}
+                      placeholder="e.g. SAVE10"
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-xl text-xs uppercase font-mono tracking-wider focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponValidating || !couponInput.trim()}
+                      className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      {couponValidating ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        'Apply'
+                      )}
+                    </button>
+                  </div>
+
+                  {couponError && (
+                    <p className="text-[11px] text-rose-600 flex items-center gap-1 pt-0.5">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                      {couponError}
+                    </p>
+                  )}
+                  {couponSuccessMessage && (
+                    <p className="text-[11px] text-emerald-600 flex items-center gap-1 pt-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      {couponSuccessMessage}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Calculations Breakdown in BDT & USD */}
             <div className="pt-3 border-t border-slate-100 space-y-2.5 text-xs">
               <div className="flex justify-between text-slate-600">
@@ -867,6 +993,22 @@ export const CheckoutPage = () => {
                   <span className="text-[11px] text-slate-400">({formatUSD(subtotal)})</span>
                 </span>
               </div>
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-emerald-700 bg-emerald-50/70 p-2 rounded-lg border border-emerald-200">
+                  <span className="font-medium flex items-center gap-1">
+                    <Tag className="w-3.5 h-3.5" />
+                    Coupon Discount ({appliedCoupon.coupon.code})
+                  </span>
+                  <span className="font-bold">
+                    -{formatBDT(discountAmount)}{' '}
+                    <span className="text-[11px] text-emerald-600 font-mono">
+                      (-{formatUSD(discountAmount)})
+                    </span>
+                  </span>
+                </div>
+              )}
+
               <div className="flex justify-between text-slate-600">
                 <span>Shipping</span>
                 <span className="font-semibold text-slate-800">
@@ -883,8 +1025,8 @@ export const CheckoutPage = () => {
               <div className="flex justify-between text-slate-600">
                 <span>Estimated Tax (8%)</span>
                 <span className="font-semibold text-slate-800">
-                  {formatBDT(estimatedTax)}{' '}
-                  <span className="text-[11px] text-slate-400">({formatUSD(estimatedTax)})</span>
+                  {formatBDT(effectiveTax)}{' '}
+                  <span className="text-[11px] text-slate-400">({formatUSD(effectiveTax)})</span>
                 </span>
               </div>
 
@@ -892,12 +1034,12 @@ export const CheckoutPage = () => {
                 <div className="flex justify-between items-baseline">
                   <span className="font-bold text-slate-900 text-sm">Grand Total (BDT)</span>
                   <span className="text-2xl font-extrabold text-emerald-700">
-                    {formatBDT(grandTotal)}
+                    {formatBDT(finalGrandTotal)}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-400">
                   <span>Equivalent in USD:</span>
-                  <span className="font-medium text-slate-600">{formatUSD(grandTotal)}</span>
+                  <span className="font-medium text-slate-600">{formatUSD(finalGrandTotal)}</span>
                 </div>
               </div>
             </div>
@@ -905,7 +1047,7 @@ export const CheckoutPage = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {submitting ? (
                 <>
@@ -914,7 +1056,7 @@ export const CheckoutPage = () => {
                 </>
               ) : (
                 <>
-                  Confirm & Place Order ({formatBDT(grandTotal)})
+                  Confirm & Place Order ({formatBDT(finalGrandTotal)})
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

@@ -1,4 +1,5 @@
 import prisma from '../config/db.js';
+import { notifyAdmins } from './notification.service.js';
 
 // Configurable policy constant for customer return eligibility (7 days from purchase/delivery)
 export const RETURN_WINDOW_DAYS = 7;
@@ -86,6 +87,16 @@ export const createReturnRequest = async ({
   const verifiedReturnItems = [];
   let calculatedRefundTotal = 0;
 
+  // Calculate proportional discount ratio if order had discount applied
+  const orderItemsSubtotal = order.items.reduce(
+    (sum, item) => sum + item.unitPrice * item.quantity,
+    0
+  );
+  const discountRatio =
+    order.discountAmount && orderItemsSubtotal > 0
+      ? order.discountAmount / orderItemsSubtotal
+      : 0;
+
   for (const reqItem of items) {
     const orderItemId = parseInt(reqItem.orderItemId, 10);
     const returnQty = parseInt(reqItem.quantity, 10);
@@ -118,7 +129,9 @@ export const createReturnRequest = async ({
       throw error;
     }
 
-    calculatedRefundTotal += orderItem.unitPrice * returnQty;
+    // Proportional refund per returned unit respecting order discount
+    const effectiveUnitPrice = orderItem.unitPrice * (1 - discountRatio);
+    calculatedRefundTotal += effectiveUnitPrice * returnQty;
 
     verifiedReturnItems.push({
       orderItemId,
@@ -126,48 +139,77 @@ export const createReturnRequest = async ({
     });
   }
 
+  calculatedRefundTotal = parseFloat(calculatedRefundTotal.toFixed(2));
+
   // 3. Create ReturnRequest and ReturnItems inside an atomic transaction
-  return await prisma.$transaction(async (tx) => {
-    const returnRequest = await tx.returnRequest.create({
-      data: {
-        orderId: parsedOrderId,
-        userId,
-        reason: reason.trim(),
-        customerNotes: customerNotes ? customerNotes.trim() : null,
-        status: 'REQUESTED',
-        refundStatus: 'PENDING',
-        refundAmount: calculatedRefundTotal,
-        items: {
-          create: verifiedReturnItems.map((v) => ({
-            orderItemId: v.orderItemId,
-            quantity: v.quantity,
-            restocked: false,
-          })),
+  const returnRequest = await prisma.$transaction(
+    async (tx) => {
+      const created = await tx.returnRequest.create({
+        data: {
+          orderId: parsedOrderId,
+          userId,
+          reason: reason.trim(),
+          customerNotes: customerNotes ? customerNotes.trim() : null,
+          status: 'REQUESTED',
+          refundStatus: 'PENDING',
+          refundAmount: calculatedRefundTotal,
+          items: {
+            create: verifiedReturnItems.map((v) => ({
+              orderItemId: v.orderItemId,
+              quantity: v.quantity,
+              restocked: false,
+            })),
+          },
         },
-      },
-      include: {
-        items: {
-          include: {
-            orderItem: {
-              include: {
-                product: {
-                  select: {
-                    id: true,
-                    name: true,
-                    imageUrl: true,
+        include: {
+          items: {
+            include: {
+              orderItem: {
+                include: {
+                  product: {
+                    select: {
+                      id: true,
+                      name: true,
+                      imageUrl: true,
+                    },
                   },
                 },
               },
             },
           },
+          order: true,
         },
-      },
-    });
+      });
 
-    return returnRequest;
+      // Customer in-app notification
+      await tx.notification.create({
+        data: {
+          userId,
+          type: 'RETURN_REQUESTED',
+          title: `Return Request #RET-${created.id} Submitted`,
+          message: `Return request submitted for Order #${parsedOrderId} (Estimated refund: ৳${calculatedRefundTotal.toFixed(2)}).`,
+          link: `/orders`,
+        },
+      });
+
+      return created;
     },
     { maxWait: 10000, timeout: 20000 }
   );
+
+  // Dispatch asynchronous admin notification
+  try {
+    await notifyAdmins({
+      type: 'RETURN_REQUESTED',
+      title: `New Return Request #RET-${returnRequest.id}`,
+      message: `Customer requested return on Order #${parsedOrderId} for ৳${calculatedRefundTotal.toFixed(2)}.`,
+      link: `/admin`,
+    });
+  } catch (err) {
+    console.error('Failed to notify admins of return request:', err.message);
+  }
+
+  return returnRequest;
 };
 
 /**
@@ -434,6 +476,22 @@ export const updateReturnStatusAdmin = async (
         },
       },
     });
+
+    if (newStatus && newStatus !== existing.status) {
+      await tx.notification.create({
+        data: {
+          userId: existing.userId,
+          type: newStatus === 'REFUNDED' ? 'REFUND_COMPLETED' : 'RETURN_UPDATED',
+          title: `Return Request #RET-${existing.id} ${newStatus.replace('_', ' ')}`,
+          message: `Your return request for Order #${existing.orderId} status has been updated to "${newStatus}"${
+            newStatus === 'REFUNDED'
+              ? ` with a completed refund of ৳${(existing.refundAmount || 0).toFixed(2)}.`
+              : '.'
+          }`,
+          link: `/orders`,
+        },
+      });
+    }
 
     return updated;
     },

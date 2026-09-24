@@ -32,6 +32,9 @@ model User {
   orders         Order[]
   reviews        Review[]
   returnRequests ReturnRequest[]
+  wishlistItems  WishlistItem[]
+  couponUsages   CouponUsage[]
+  notifications  Notification[]
 }
 
 model Category {
@@ -57,8 +60,9 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  orderItems OrderItem[]
-  reviews    Review[]
+  orderItems    OrderItem[]
+  reviews       Review[]
+  wishlistItems WishlistItem[]
 }
 
 model Order {
@@ -68,10 +72,15 @@ model Order {
   totalAmount     Float
   status          OrderStatus @default(PENDING)
   shippingAddress String
+  couponId        Int?
+  coupon          Coupon?      @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponCode      String?
+  discountAmount  Float        @default(0)
   createdAt       DateTime    @default(now())
 
   items          OrderItem[]
   returnRequests ReturnRequest[]
+  couponUsage    CouponUsage?
 }
 
 model OrderItem {
@@ -140,3 +149,77 @@ model ReturnItem {
   restocked       Boolean       @default(false)
   createdAt       DateTime      @default(now())
 }
+
+model WishlistItem {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+model Coupon {
+  id             Int          @id @default(autoincrement())
+  code           String       @unique
+  discountType   DiscountType @default(PERCENTAGE)
+  discountValue  Float
+  minOrderAmount Float?
+  maxDiscount    Float?
+  startDate      DateTime?
+  expiryDate     DateTime?
+  usageLimit     Int?
+  perUserLimit   Int?         @default(1)
+  isActive       Boolean      @default(true)
+  usedCount      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  usages CouponUsage[]
+  orders Order[]
+}
+
+model CouponUsage {
+  id        Int      @id @default(autoincrement())
+  couponId  Int
+  coupon    Coupon   @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId   Int      @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  usedAt    DateTime @default(now())
+
+  @@index([couponId, userId])
+}
+
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_STATUS_CHANGED
+  RETURN_REQUESTED
+  RETURN_UPDATED
+  REFUND_COMPLETED
+  COUPON_APPLIED
+  SYSTEM
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(SYSTEM)
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}
+

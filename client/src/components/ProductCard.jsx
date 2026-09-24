@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { Eye, CheckCircle2, AlertTriangle, ShoppingCart, Star } from 'lucide-react';
+import { useWishlist } from '../context/WishlistContext';
+import { Eye, CheckCircle2, AlertTriangle, ShoppingCart, Star, Heart } from 'lucide-react';
 import { formatBDT } from '../utils/currency';
 
 export const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const isWishlisted = isInWishlist(product.id);
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col group">
       {/* Product Image */}
@@ -25,6 +29,24 @@ export const ProductCard = ({ product }) => {
             {product.category.name}
           </span>
         )}
+
+        {/* Wishlist Heart Button */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleWishlist(product);
+          }}
+          className={`absolute bottom-3 right-3 p-2 rounded-xl backdrop-blur-md transition-all shadow-sm cursor-pointer ${
+            isWishlisted
+              ? 'bg-rose-500 text-white hover:bg-rose-600'
+              : 'bg-white/90 text-slate-600 hover:text-rose-500 hover:bg-white'
+          }`}
+          title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+        >
+          <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
+        </button>
 
         {/* Stock Badge */}
         <div className="absolute top-3 right-3">
