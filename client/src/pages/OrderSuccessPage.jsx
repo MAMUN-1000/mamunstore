@@ -237,10 +237,18 @@ export const OrderSuccessPage = () => {
       </div>
 
       {/* Quick Action Navigation Buttons */}
-      <div className="flex flex-col sm:flex-row items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <Link
+          to={`/orders/${order.id}/invoice`}
+          className="w-full sm:w-1/3 py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs text-center transition shadow-sm flex items-center justify-center gap-2"
+        >
+          <Receipt className="w-4 h-4" />
+          Print / View Invoice
+        </Link>
+
         <Link
           to="/orders"
-          className="w-full sm:w-1/2 py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs text-center transition shadow-sm flex items-center justify-center gap-2"
+          className="w-full sm:w-1/3 py-3.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs text-center transition shadow-sm flex items-center justify-center gap-2"
         >
           <Package className="w-4 h-4" />
           View All Past Orders
@@ -248,7 +256,7 @@ export const OrderSuccessPage = () => {
 
         <Link
           to="/products"
-          className="w-full sm:w-1/2 py-3.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs text-center transition flex items-center justify-center gap-2"
+          className="w-full sm:w-1/3 py-3.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs text-center transition flex items-center justify-center gap-2"
         >
           <ShoppingBag className="w-4 h-4" />
           Continue Shopping

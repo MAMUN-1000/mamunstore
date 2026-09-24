@@ -29,8 +29,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders  Order[]
-  reviews Review[]
+  orders         Order[]
+  reviews        Review[]
+  returnRequests ReturnRequest[]
 }
 
 model Category {
@@ -69,7 +70,8 @@ model Order {
   shippingAddress String
   createdAt       DateTime    @default(now())
 
-  items OrderItem[]
+  items          OrderItem[]
+  returnRequests ReturnRequest[]
 }
 
 model OrderItem {
@@ -80,6 +82,8 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
   quantity  Int
   unitPrice Float
+
+  returnItems ReturnItem[]
 }
 
 model Review {
@@ -91,4 +95,48 @@ model Review {
   rating    Int
   comment   String?
   createdAt DateTime @default(now())
+}
+
+enum ReturnStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  REFUNDED
+}
+
+enum RefundStatus {
+  NOT_APPLICABLE
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+model ReturnRequest {
+  id            Int          @id @default(autoincrement())
+  orderId       Int
+  order         Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId        Int
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        ReturnStatus @default(REQUESTED)
+  reason        String
+  customerNotes String?
+  adminNotes    String?
+  refundAmount  Float?
+  refundStatus  RefundStatus @default(PENDING)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  items ReturnItem[]
+}
+
+model ReturnItem {
+  id              Int           @id @default(autoincrement())
+  returnRequestId Int
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItemId     Int
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  quantity        Int
+  restocked       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
 }

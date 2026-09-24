@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { formatBDT, formatUSD } from '../../utils/currency';
 import ProductModal from '../../components/admin/ProductModal';
 import OrderDetailModal from '../../components/admin/OrderDetailModal';
+import ReturnDetailModal from '../../components/admin/ReturnDetailModal';
 import {
   ShieldCheck,
   RefreshCw,
@@ -22,6 +23,7 @@ import {
   Truck,
   Search,
   Filter,
+  RotateCcw,
 } from 'lucide-react';
 
 export const AdminDashboardPage = () => {
@@ -46,11 +48,18 @@ export const AdminDashboardPage = () => {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderStatusFilter, setOrderStatusFilter] = useState('ALL');
 
+  // Returns Data
+  const [returns, setReturns] = useState([]);
+  const [returnsLoading, setReturnsLoading] = useState(false);
+  const [returnStatusFilter, setReturnStatusFilter] = useState('ALL');
+
   // Modals State
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderModalOpen, setOrderModalOpen] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState(null);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
 
   // Error & Status Messages
   const [globalError, setGlobalError] = useState(null);
@@ -116,6 +125,24 @@ export const AdminDashboardPage = () => {
     }
   }, [orderStatusFilter]);
 
+  // 5. Fetch Return Requests
+  const fetchReturns = useCallback(async () => {
+    try {
+      setReturnsLoading(true);
+      const res = await axiosInstance.get('/returns/admin/all', {
+        params: {
+          status: returnStatusFilter === 'ALL' ? undefined : returnStatusFilter,
+          limit: 50,
+        },
+      });
+      setReturns(res.data.data.returns || []);
+    } catch (err) {
+      console.error('Failed to load return requests for admin:', err);
+    } finally {
+      setReturnsLoading(false);
+    }
+  }, [returnStatusFilter]);
+
   // Initial Data Load
   useEffect(() => {
     fetchMetrics();
@@ -127,8 +154,10 @@ export const AdminDashboardPage = () => {
       fetchProducts();
     } else if (activeTab === 'orders') {
       fetchOrders();
+    } else if (activeTab === 'returns') {
+      fetchReturns();
     }
-  }, [activeTab, fetchProducts, fetchOrders]);
+  }, [activeTab, fetchProducts, fetchOrders, fetchReturns]);
 
   // Product Delete Handler
   const handleDeleteProduct = async (product) => {
@@ -209,6 +238,46 @@ export const AdminDashboardPage = () => {
     }
   };
 
+  const getReturnStatusBadge = (st) => {
+    switch (st) {
+      case 'REFUNDED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+            Refunded
+          </span>
+        );
+      case 'APPROVED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            <CheckCircle2 className="w-3 h-3 text-blue-600" />
+            Approved
+          </span>
+        );
+      case 'UNDER_REVIEW':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+            <Clock className="w-3 h-3 text-amber-600" />
+            Under Review
+          </span>
+        );
+      case 'REJECTED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+            <AlertCircle className="w-3 h-3 text-rose-600" />
+            Rejected
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+            <Clock className="w-3 h-3 text-slate-500" />
+            Requested
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       {/* Top Banner */}
@@ -238,6 +307,7 @@ export const AdminDashboardPage = () => {
               fetchMetrics();
               if (activeTab === 'products') fetchProducts();
               if (activeTab === 'orders') fetchOrders();
+              if (activeTab === 'returns') fetchReturns();
             }}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
           >
@@ -290,6 +360,18 @@ export const AdminDashboardPage = () => {
         >
           <Receipt className="w-4 h-4" />
           Customer Orders ({metrics?.kpis.totalOrders ?? '...'})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('returns')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
+            activeTab === 'returns'
+              ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+          }`}
+        >
+          <RotateCcw className="w-4 h-4" />
+          Returns &amp; Refunds
         </button>
       </div>
 
@@ -802,6 +884,144 @@ export const AdminDashboardPage = () => {
         </div>
       )}
 
+      {/* ======================================================== */}
+      {/* TAB 4: RETURNS & REFUNDS MANAGEMENT */}
+      {/* ======================================================== */}
+      {activeTab === 'returns' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Controls Bar */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-base text-slate-900 tracking-tight">
+                  Customer Return Requests ({returns.length})
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Review partial item returns, inspect defect descriptions, and issue refunds.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5" /> Filter:
+              </span>
+              <select
+                value={returnStatusFilter}
+                onChange={(e) => setReturnStatusFilter(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-xl text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 transition"
+              >
+                <option value="ALL">All Return Statuses</option>
+                <option value="REQUESTED">Requested (New)</option>
+                <option value="UNDER_REVIEW">Under Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REFUNDED">Refunded</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Returns Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+            {returnsLoading ? (
+              <div className="py-16 text-center text-slate-500 space-y-2">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto text-purple-600" />
+                <p className="text-xs">Loading return requests...</p>
+              </div>
+            ) : returns.length === 0 ? (
+              <div className="py-16 text-center text-slate-500 space-y-2">
+                <RotateCcw className="w-8 h-8 mx-auto text-slate-300" />
+                <p className="text-sm font-semibold text-slate-700">No return requests found</p>
+                <p className="text-xs text-slate-400">
+                  {returnStatusFilter !== 'ALL'
+                    ? `No requests matching status "${returnStatusFilter}".`
+                    : 'No customer return requests have been submitted yet.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/70 text-slate-500 font-bold uppercase text-[10px]">
+                      <th className="py-3 px-4">Return ID</th>
+                      <th className="py-3 px-4">Order Ref</th>
+                      <th className="py-3 px-4">Customer</th>
+                      <th className="py-3 px-4">Returned Items</th>
+                      <th className="py-3 px-4">Reason</th>
+                      <th className="py-3 px-4">Refund Amount</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {returns.map((ret) => (
+                      <tr key={ret.id} className="hover:bg-slate-50/60 transition">
+                        <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">
+                          #RET-{ret.id}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-semibold text-purple-700">
+                          #ORD-{ret.orderId}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-bold text-slate-900 block truncate">
+                            {ret.user?.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block truncate">
+                            {ret.user?.email}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-semibold text-slate-800 block">
+                            {ret.items?.length} item line(s)
+                          </span>
+                          <span className="text-[10px] text-slate-500 line-clamp-1">
+                            {ret.items?.map((i) => `${i.quantity}x ${i.orderItem?.product?.name}`).join(', ')}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-medium text-slate-800 block">
+                            {ret.reason}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            {new Date(ret.createdAt).toLocaleDateString()}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="font-extrabold text-emerald-700 block font-mono">
+                            {formatBDT(ret.refundAmount || 0)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {formatUSD(ret.refundAmount || 0)}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {getReturnStatusBadge(ret.status)}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedReturn(ret);
+                              setReturnModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 font-semibold text-xs transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Review &amp; Resolve
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Product Modal (Create & Edit) */}
       <ProductModal
         isOpen={productModalOpen}
@@ -822,6 +1042,17 @@ export const AdminDashboardPage = () => {
         order={selectedOrder}
         onStatusUpdated={() => {
           fetchOrders();
+          fetchMetrics();
+        }}
+      />
+
+      {/* Return Detail Modal */}
+      <ReturnDetailModal
+        isOpen={returnModalOpen}
+        onClose={() => setReturnModalOpen(false)}
+        returnRequest={selectedReturn}
+        onUpdated={() => {
+          fetchReturns();
           fetchMetrics();
         }}
       />

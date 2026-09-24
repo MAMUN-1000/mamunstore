@@ -15,6 +15,7 @@ import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import OrderSuccessPage from './pages/OrderSuccessPage';
 import OrdersPage from './pages/OrdersPage';
+import InvoicePage from './pages/InvoicePage';
 import HelpCenterPage from './pages/HelpCenterPage';
 import CustomerCarePage from './pages/CustomerCarePage';
 import FaqPage from './pages/FaqPage';
@@ -68,6 +69,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/orders/:id/invoice"
+            element={
+              <ProtectedRoute>
+                <InvoicePage />
               </ProtectedRoute>
             }
           />

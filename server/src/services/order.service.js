@@ -14,8 +14,9 @@ export const createOrder = async ({ userId, items, shippingAddress }) => {
     throw error;
   }
 
-  // Execute inside an atomic transaction
-  return await prisma.$transaction(async (tx) => {
+  // Execute inside an atomic transaction with remote network tolerance
+  return await prisma.$transaction(
+    async (tx) => {
     let subtotal = 0;
     const verifiedItems = [];
 
@@ -108,7 +109,9 @@ export const createOrder = async ({ userId, items, shippingAddress }) => {
     });
 
     return order;
-  });
+    },
+    { maxWait: 10000, timeout: 20000 }
+  );
 };
 
 /**
@@ -127,6 +130,24 @@ export const getMyOrders = async (userId) => {
               imageUrl: true,
             },
           },
+          returnItems: {
+            include: {
+              returnRequest: {
+                select: {
+                  id: true,
+                  status: true,
+                  refundStatus: true,
+                  reason: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      returnRequests: {
+        include: {
+          items: true,
         },
       },
     },
@@ -153,6 +174,24 @@ export const getOrderById = async (orderId, userId, userRole) => {
       items: {
         include: {
           product: true,
+          returnItems: {
+            include: {
+              returnRequest: true,
+            },
+          },
+        },
+      },
+      returnRequests: {
+        include: {
+          items: {
+            include: {
+              orderItem: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          },
         },
       },
       user: {

@@ -14,30 +14,84 @@ import {
   AlertCircle,
   CreditCard,
   MapPin,
+  Receipt,
+  RotateCcw,
 } from 'lucide-react';
+import ReturnRequestModal from '../components/orders/ReturnRequestModal';
 
 export const OrdersPage = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null);
+  const [returnModalOpen, setReturnModalOpen] = useState(false);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await axiosInstance.get('/orders/my-orders');
+      setOrders(res.data.data.orders || []);
+    } catch (err) {
+      console.error('Failed to load order history:', err);
+      setError(err.response?.data?.message || 'Failed to retrieve order history.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await axiosInstance.get('/orders/my-orders');
-        setOrders(res.data.data.orders || []);
-      } catch (err) {
-        console.error('Failed to load order history:', err);
-        setError(err.response?.data?.message || 'Failed to retrieve order history.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchOrders();
   }, []);
+
+  const handleOpenReturnModal = (order) => {
+    setSelectedOrderForReturn(order);
+    setReturnModalOpen(true);
+  };
+
+  const handleReturnSuccess = () => {
+    fetchOrders();
+  };
+
+  const getItemReturnBadge = (item) => {
+    if (!item.returnItems || item.returnItems.length === 0) return null;
+    const latestReturn = item.returnItems[item.returnItems.length - 1];
+    const status = latestReturn.returnRequest?.status;
+
+    if (status === 'REFUNDED') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+          <CheckCircle2 className="w-3 h-3" />
+          Refunded ({latestReturn.quantity} unit{latestReturn.quantity > 1 ? 's' : ''})
+        </span>
+      );
+    }
+    if (status === 'APPROVED') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+          <CheckCircle2 className="w-3 h-3" />
+          Return Approved
+        </span>
+      );
+    }
+    if (status === 'UNDER_REVIEW' || status === 'REQUESTED') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+          <Clock className="w-3 h-3" />
+          Return {status === 'UNDER_REVIEW' ? 'Under Review' : 'Requested'} ({latestReturn.quantity} unit{latestReturn.quantity > 1 ? 's' : ''})
+        </span>
+      );
+    }
+    if (status === 'REJECTED') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+          <AlertCircle className="w-3 h-3" />
+          Return Rejected
+        </span>
+      );
+    }
+    return null;
+  };
 
   const getStatusBadge = (status, paymentMethod) => {
     switch (status) {
@@ -240,9 +294,14 @@ export const OrdersPage = () => {
                           <span className="font-bold text-slate-800 block truncate">
                             {item.product?.name || `Product #${item.productId}`}
                           </span>
-                          <span className="text-slate-500 font-mono text-[11px]">
+                          <span className="text-slate-500 font-mono text-[11px] block">
                             Qty: {item.quantity} × {formatBDT(item.unitPrice)} ({formatUSD(item.unitPrice)})
                           </span>
+                          {getItemReturnBadge(item) && (
+                            <div className="mt-1">
+                              {getItemReturnBadge(item)}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
@@ -257,13 +316,34 @@ export const OrdersPage = () => {
                   ))}
                 </div>
 
-                {/* Order Footer Link */}
-                <div className="pt-3 border-t border-slate-100 flex justify-end">
+                {/* Order Footer Actions */}
+                <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={`/orders/${order.id}/invoice`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-2xs transition"
+                    >
+                      <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Print / View Invoice</span>
+                    </Link>
+
+                    {order.status === 'DELIVERED' && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenReturnModal(order)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold transition cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Request Return / Refund</span>
+                      </button>
+                    )}
+                  </div>
+
                   <Link
                     to={`/order-success/${order.id}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition ml-auto"
                   >
-                    View Full Receipt & Delivery Details
+                    <span>Order Receipt &amp; Status</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </Link>
                 </div>
@@ -271,6 +351,19 @@ export const OrdersPage = () => {
             );
           })}
         </div>
+      )}
+
+      {/* Partial Return Request Modal */}
+      {selectedOrderForReturn && (
+        <ReturnRequestModal
+          order={selectedOrderForReturn}
+          isOpen={returnModalOpen}
+          onClose={() => {
+            setReturnModalOpen(false);
+            setSelectedOrderForReturn(null);
+          }}
+          onSuccess={handleReturnSuccess}
+        />
       )}
     </div>
   );

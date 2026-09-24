@@ -7,6 +7,7 @@ import authRoutes from './routes/auth.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
 import orderRoutes from './routes/order.routes.js';
+import returnRoutes from './routes/return.routes.js';
 import reviewRoutes from './routes/review.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
@@ -97,6 +98,9 @@ app.use('/api/products', productRoutes);
 
 // Order Routes
 app.use('/api/orders', orderRoutes);
+
+// Return & Refund Routes
+app.use('/api/returns', returnRoutes);
 
 // Review & Ratings Routes
 app.use('/api', reviewRoutes);
