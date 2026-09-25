@@ -168,7 +168,7 @@ export const CustomerCarePage = () => {
                 Inquiry Received Successfully!
               </h3>
               <p className="text-xs text-emerald-700 max-w-md mx-auto leading-relaxed">
-                Thank you for contacting InternshipStore Customer Care. A member of our support team will review your inquiry and follow up at your provided email.
+                Thank you for contacting MamunStore Customer Care. A member of our support team will review your inquiry and follow up at your provided email.
               </p>
               <div className="pt-2">
                 <button

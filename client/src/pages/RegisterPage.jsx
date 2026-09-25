@@ -60,7 +60,7 @@ export const RegisterPage = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Create an Account</h1>
           <p className="text-xs text-slate-500">
-            Join the store to order products and save your shipping info.
+            Join MamunStore to order products and save your shipping info.
           </p>
         </div>
 

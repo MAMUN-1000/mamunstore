@@ -66,7 +66,7 @@ export const Footer = () => {
               <ShoppingBag className="w-4 h-4" />
             </div>
             <span className="font-extrabold text-base text-slate-900 tracking-tight">
-              Internship<span className="text-emerald-600">Store</span>
+              Mamun<span className="text-emerald-600">Store</span>
             </span>
           </Link>
           <p className="text-slate-500 leading-relaxed text-[11px]">
@@ -217,7 +217,7 @@ export const Footer = () => {
           </div>
 
           <p className="text-[11px] text-slate-400 text-center md:text-right">
-            &copy; {new Date().getFullYear()} InternshipStore BD. Single-Vendor Retail Storefront.
+            &copy; {new Date().getFullYear()} MamunStore BD. Single-Vendor Retail Storefront.
           </p>
         </div>
       </div>

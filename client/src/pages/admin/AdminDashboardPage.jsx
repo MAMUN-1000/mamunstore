@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axiosInstance from '../../api/axiosInstance';
 import { useAuth } from '../../context/AuthContext';
 import { formatBDT, formatUSD } from '../../utils/currency';
@@ -30,9 +31,26 @@ import {
 
 export const AdminDashboardPage = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Active Tab: 'analytics' | 'products' | 'orders'
-  const [activeTab, setActiveTab] = useState('analytics');
+  // Active Tab: 'analytics' | 'products' | 'orders' | 'returns' | 'coupons'
+  const tabFromQuery = searchParams.get('tab');
+  const validTabs = ['analytics', 'products', 'orders', 'returns', 'coupons'];
+  const [activeTab, setActiveTab] = useState(
+    tabFromQuery && validTabs.includes(tabFromQuery) ? tabFromQuery : 'analytics'
+  );
+
+  // Sync activeTab when query param in URL changes (e.g. from navbar navigation)
+  useEffect(() => {
+    if (tabFromQuery && validTabs.includes(tabFromQuery)) {
+      setActiveTab(tabFromQuery);
+    }
+  }, [tabFromQuery]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   // Metrics Data
   const [metrics, setMetrics] = useState(null);
@@ -379,7 +397,7 @@ export const AdminDashboardPage = () => {
       {/* Tab Navigation Navigation Bar */}
       <div className="flex items-center border-b border-slate-200 text-sm font-semibold gap-2 overflow-x-auto pb-1">
         <button
-          onClick={() => setActiveTab('analytics')}
+          onClick={() => handleTabChange('analytics')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
             activeTab === 'analytics'
               ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
@@ -391,7 +409,7 @@ export const AdminDashboardPage = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('products')}
+          onClick={() => handleTabChange('products')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
             activeTab === 'products'
               ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
@@ -403,7 +421,7 @@ export const AdminDashboardPage = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('orders')}
+          onClick={() => handleTabChange('orders')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
             activeTab === 'orders'
               ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
@@ -415,7 +433,7 @@ export const AdminDashboardPage = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('returns')}
+          onClick={() => handleTabChange('returns')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition ${
             activeTab === 'returns'
               ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'
@@ -427,7 +445,7 @@ export const AdminDashboardPage = () => {
         </button>
 
         <button
-          onClick={() => setActiveTab('coupons')}
+          onClick={() => handleTabChange('coupons')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition cursor-pointer ${
             activeTab === 'coupons'
               ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600'

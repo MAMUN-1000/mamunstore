@@ -34,58 +34,110 @@ export const Navbar = () => {
             <ShoppingBag className="w-5 h-5" />
           </div>
           <span className="font-bold text-lg text-slate-900 tracking-tight">
-            Internship<span className="text-emerald-600">Store</span>
+            Mamun<span className="text-emerald-600">Store</span>
           </span>
         </Link>
 
         {/* Center / Navigation Links */}
-        <nav className="flex items-center gap-6">
-          <Link
-            to="/"
-            className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors"
-          >
-            Home
-          </Link>
-
-          <Link
-            to="/products"
-            className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors"
-          >
-            Catalog
-          </Link>
-
-          <Link
-            to="/help"
-            className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors"
-          >
-            Help
-          </Link>
-
-          {user && (
-            <Link
-              to="/orders"
-              className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors"
-            >
-              My Orders
-            </Link>
-          )}
-
-          {/* Admin link if user is ADMIN */}
-          {isAdmin && (
-            <Link
-              to="/admin"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
-              Admin Portal
-            </Link>
+        <nav className="flex items-center gap-3.5 lg:gap-5">
+          {isAdmin ? (
+            // Dedicated Admin Navigation Links
+            <>
+              <Link
+                to="/"
+                className="text-sm font-medium text-slate-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+              >
+                Storefront
+              </Link>
+              <Link
+                to="/products"
+                className="text-sm font-medium text-slate-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+              >
+                Catalog
+              </Link>
+              <Link
+                to="/admin"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors whitespace-nowrap"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                Admin Portal
+              </Link>
+              <Link
+                to="/admin?tab=orders"
+                className="text-sm font-medium text-slate-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+              >
+                Orders
+              </Link>
+              <Link
+                to="/admin?tab=returns"
+                className="text-sm font-medium text-slate-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+              >
+                Returns &amp; Refunds
+              </Link>
+              <Link
+                to="/admin?tab=coupons"
+                className="text-sm font-medium text-slate-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+              >
+                Coupons
+              </Link>
+              <Link
+                to="/admin?tab=products"
+                className="text-sm font-medium text-slate-600 hover:text-purple-600 transition-colors whitespace-nowrap"
+              >
+                Inventory
+              </Link>
+            </>
+          ) : (
+            // Customer & Guest Navigation Links
+            <>
+              <Link
+                to="/"
+                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors whitespace-nowrap"
+              >
+                Home
+              </Link>
+              <Link
+                to="/products"
+                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors whitespace-nowrap"
+              >
+                Catalog
+              </Link>
+              {user && (
+                <>
+                  <Link
+                    to="/orders"
+                    className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors whitespace-nowrap"
+                  >
+                    My Orders
+                  </Link>
+                  <Link
+                    to="/orders"
+                    className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors whitespace-nowrap"
+                  >
+                    Returns &amp; Refunds
+                  </Link>
+                </>
+              )}
+              <Link
+                to="/customer-care"
+                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors whitespace-nowrap"
+              >
+                Customer Care
+              </Link>
+              <Link
+                to="/help"
+                className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors whitespace-nowrap"
+              >
+                Help Center
+              </Link>
+            </>
           )}
         </nav>
 
         {/* Right / Auth & Cart Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Wishlist Link */}
-          {user && (
+          {/* Wishlist Link (Customer Only) */}
+          {user && !isAdmin && (
             <Link
               to="/wishlist"
               className="relative p-2 rounded-xl text-slate-700 hover:text-rose-600 hover:bg-rose-50 transition"

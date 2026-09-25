@@ -5,7 +5,7 @@
  */
 
 export const SUPPORT_CONFIG = {
-  storeName: 'InternshipStore',
+  storeName: 'MamunStore',
   campusDesk: 'Jahangirnagar University, Savar, Dhaka - 1342',
   phone: '+880 1712-345678',
   email: 'support@internshipstore.bd',

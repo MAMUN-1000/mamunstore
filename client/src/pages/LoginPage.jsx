@@ -67,7 +67,7 @@ export const LoginPage = () => {
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Sign In to Your Account</h1>
           <p className="text-xs text-slate-500">
-            Welcome back! Enter your email and password below.
+            Welcome back to MamunStore! Enter your email and password below.
           </p>
         </div>
 

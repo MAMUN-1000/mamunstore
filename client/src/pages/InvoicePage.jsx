@@ -124,7 +124,7 @@ export const InvoicePage = () => {
                 <ShoppingBag className="w-5 h-5" />
               </div>
               <span className="font-extrabold text-xl text-slate-900 tracking-tight">
-                Internship<span className="text-emerald-600">Store</span>
+                Mamun<span className="text-emerald-600">Store</span>
               </span>
             </div>
             <div className="text-xs text-slate-500 space-y-0.5">
@@ -325,11 +325,11 @@ export const InvoicePage = () => {
         {/* Footer Notes & Legal */}
         <div className="pt-6 border-t border-slate-200 text-center space-y-1.5 text-[11px] text-slate-400">
           <p className="font-semibold text-slate-600">
-            Thank you for shopping with InternshipStore!
+            Thank you for shopping with MamunStore!
           </p>
           <p>
             For customer support or return inquiries, please visit our Help Center at{' '}
-            <span className="font-semibold text-slate-700">internshipstore.bd/help</span> or contact us at{' '}
+            <span className="font-semibold text-slate-700">mamunstore.bd/help</span> or contact us at{' '}
             <span className="font-semibold text-slate-700">{SUPPORT_CONFIG.email}</span>.
           </p>
           <p className="text-[10px] text-slate-400">
