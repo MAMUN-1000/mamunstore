@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   Headphones,
   MapPin,
@@ -14,10 +15,12 @@ import {
   ShoppingBag,
   RefreshCw,
   HelpCircle,
+  LogIn,
 } from 'lucide-react';
 import { SUPPORT_CONFIG } from '../data/helpKnowledgeBase';
 
 export const CustomerCarePage = () => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -25,6 +28,17 @@ export const CustomerCarePage = () => {
     category: 'Order & Delivery',
     message: '',
   });
+
+  // Pre-fill name and email if customer is logged in
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || user.name || '',
+        email: prev.email || user.email || '',
+      }));
+    }
+  }, [user]);
 
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -38,6 +52,12 @@ export const CustomerCarePage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     setError(null);
+
+    // Submitting inquiry strictly requires authentication
+    if (!user) {
+      setError('Authentication required: Please sign in to submit a customer support inquiry.');
+      return;
+    }
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
       setError('Please fill in your name, email, and inquiry message.');
@@ -153,9 +173,45 @@ export const CustomerCarePage = () => {
           </div>
 
           {error && (
-            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2.5 text-xs text-rose-700">
-              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-rose-700">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+              {!user && (
+                <Link
+                  to="/login"
+                  state={{ from: { pathname: '/customer-care' } }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition shadow-2xs self-start sm:self-auto flex-shrink-0"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Sign In Now</span>
+                </Link>
+              )}
+            </div>
+          )}
+
+          {!user && !submitted && (
+            <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                  <LogIn className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-900 block sm:inline">Sign In Required to Submit: </span>
+                  <span className="text-amber-800">
+                    You can freely browse all customer service details. To submit a direct inquiry, please sign in.
+                  </span>
+                </div>
+              </div>
+              <Link
+                to="/login"
+                state={{ from: { pathname: '/customer-care' } }}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition shadow-2xs self-start sm:self-auto flex-shrink-0"
+              >
+                <span>Sign In</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           )}
 
@@ -274,6 +330,11 @@ export const CustomerCarePage = () => {
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span>Sending Inquiry...</span>
+                    </>
+                  ) : !user ? (
+                    <>
+                      <LogIn className="w-3.5 h-3.5" />
+                      <span>Sign In to Submit Inquiry</span>
                     </>
                   ) : (
                     <>
