@@ -6,6 +6,14 @@ import jwt from 'jsonwebtoken';
  * @returns {string} - Signed JWT
  */
 export const generateToken = (payload) => {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    (!process.env.JWT_SECRET ||
+      process.env.JWT_SECRET === 'dev-fallback-secret-key-do-not-use-in-production' ||
+      process.env.JWT_SECRET === 'your-super-secret-jwt-key-change-in-production')
+  ) {
+    throw new Error('A secure JWT_SECRET environment variable is strictly required in production.');
+  }
   const secret = process.env.JWT_SECRET || 'dev-fallback-secret-key-do-not-use-in-production';
   return jwt.sign(payload, secret, { expiresIn: '7d' });
 };

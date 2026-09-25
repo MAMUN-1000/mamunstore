@@ -20,6 +20,12 @@ import notificationRoutes from './routes/notification.routes.js';
 
 const app = express();
 
+// Enable reverse-proxy trust in production (Render, Railway, Vercel, Heroku)
+// Ensures express-rate-limit accurately resolves client IP from X-Forwarded-For
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // ==========================================
 // Global Security & Parsing Middleware
 // ==========================================
@@ -32,25 +38,37 @@ app.use(
   })
 );
 
+// Helper to normalize origins (strips trailing slashes, trims whitespace)
+const normalizeOrigin = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  return url.trim().replace(/\/+$/, '');
+};
+
+const configuredClientUrl = normalizeOrigin(process.env.CLIENT_URL);
+
 // 2. CORS: Allow requests from authorized frontend origins
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
   'http://localhost:3000',
-  process.env.CLIENT_URL,
+  configuredClientUrl,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (like server-to-server, curl, mobile apps, or local Supertest)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+      if (!origin) {
+        return callback(null, true);
+      }
+      const normalizedRequestOrigin = normalizeOrigin(origin);
+      if (allowedOrigins.includes(normalizedRequestOrigin)) {
+        return callback(null, true);
       } else {
         const corsErr = new Error(`CORS blocked for origin: ${origin}`);
         corsErr.status = 403;
-        callback(corsErr);
+        return callback(corsErr);
       }
     },
     credentials: true, // Allows HTTP-only cookies across origins
