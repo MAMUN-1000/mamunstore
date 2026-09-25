@@ -3,10 +3,12 @@ import { verifyAuth } from '../middleware/auth.middleware.js';
 import { verifyAdmin } from '../middleware/admin.middleware.js';
 import * as couponController from '../controllers/coupon.controller.js';
 
+import { sensitiveOpLimiter } from '../middleware/rateLimit.middleware.js';
+
 const router = Router();
 
-// Customer or authenticated user coupon validation route
-router.post('/validate', verifyAuth, couponController.validateCoupon);
+// Customer or authenticated user coupon validation route (Rate-limited against brute-force guessing)
+router.post('/validate', verifyAuth, sensitiveOpLimiter, couponController.validateCoupon);
 
 // Admin-only management endpoints (supports both /admin/* and /* paths)
 router.get('/admin/all', verifyAuth, verifyAdmin, couponController.getAllCouponsAdmin);

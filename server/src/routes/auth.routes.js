@@ -3,11 +3,13 @@ import * as authController from '../controllers/auth.controller.js';
 import { verifyAuth } from '../middleware/auth.middleware.js';
 import { verifyAdmin } from '../middleware/admin.middleware.js';
 
+import { authLimiter } from '../middleware/rateLimit.middleware.js';
+
 const router = express.Router();
 
-// Public routes
-router.post('/register', authController.register);
-router.post('/login', authController.login);
+// Public routes (Rate-limited to prevent brute-force attacks)
+router.post('/register', authLimiter, authController.register);
+router.post('/login', authLimiter, authController.login);
 
 // Authenticated routes
 router.post('/logout', verifyAuth, authController.logout);

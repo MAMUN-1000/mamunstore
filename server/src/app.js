@@ -1,8 +1,12 @@
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import 'dotenv/config';
 import prisma from './config/db.js';
+import { generalLimiter } from './middleware/rateLimit.middleware.js';
+import { notFoundHandler, errorHandler } from './middleware/error.middleware.js';
+
 import authRoutes from './routes/auth.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import productRoutes from './routes/product.routes.js';
@@ -17,37 +21,51 @@ import notificationRoutes from './routes/notification.routes.js';
 const app = express();
 
 // ==========================================
-// Global Middleware
+// Global Security & Parsing Middleware
 // ==========================================
 
-// 1. CORS: Allow requests from frontend client ports
+// 1. Helmet: Set comprehensive security headers (XSS, clickjacking, MIME sniffing protection)
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // Leave flexible for SPA client assets
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
+// 2. CORS: Allow requests from authorized frontend origins
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
+  'http://localhost:3000',
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      // Allow requests with no origin (like server-to-server, curl, mobile apps, or local Supertest)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+        const corsErr = new Error(`CORS blocked for origin: ${origin}`);
+        corsErr.status = 403;
+        callback(corsErr);
       }
     },
-    credentials: true, // Allows cookies to be sent across origins
+    credentials: true, // Allows HTTP-only cookies across origins
   })
 );
 
-// 2. Body Parsers: Parse JSON payloads and URL-encoded form data
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 3. Body Parsers: Parse JSON payloads and URL-encoded form data
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 3. Cookie Parser: Parses cookies attached to client requests into req.cookies
+// 4. Cookie Parser: Parses cookies attached to client requests into req.cookies
 app.use(cookieParser());
+
+// 5. General Rate Limiter: Baseline protection against rapid automated scraping/flooding
+app.use(generalLimiter);
 
 // ==========================================
 // Routes
@@ -83,11 +101,10 @@ app.get('/api/health/db', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Database connection error:', err.message);
     res.status(503).json({
       success: false,
       message: 'Database connection failed',
-      error: err.message,
+      error: process.env.NODE_ENV === 'production' ? 'Database unavailable' : err.message,
     });
   }
 });
@@ -120,21 +137,14 @@ app.use('/api/coupons', couponRoutes);
 // In-App Notification Routes
 app.use('/api/notifications', notificationRoutes);
 
-// 404 Handler for any unknown routes
-app.use((req, res, next) => {
-  res.status(404).json({
-    success: false,
-    message: `Route not found: ${req.method} ${req.originalUrl}`,
-  });
-});
+// ==========================================
+// Error & 404 Handlers
+// ==========================================
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error('Unhandled Server Error:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-  });
-});
+// 404 Handler for any unknown routes
+app.use(notFoundHandler);
+
+// Centralized Global Error Handler
+app.use(errorHandler);
 
 export default app;
