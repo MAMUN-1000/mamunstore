@@ -140,18 +140,18 @@ export const Footer = () => {
               </Link>
             </li>
             <li>
-              <Link to="/products?category=1" className="hover:text-emerald-600 transition">
+              <Link to="/products?category=Electronics" className="hover:text-emerald-600 transition">
                 Electronics & Gadgets
               </Link>
             </li>
             <li>
-              <Link to="/products?category=2" className="hover:text-emerald-600 transition">
-                Accessories & Audio
+              <Link to="/products?category=Accessories" className="hover:text-emerald-600 transition">
+                Accessories & Bags
               </Link>
             </li>
             <li>
-              <Link to="/products?category=3" className="hover:text-emerald-600 transition">
-                Home & Office Gear
+              <Link to="/products?category=Audio%20%26%20Gear" className="hover:text-emerald-600 transition">
+                Audio & Gear
               </Link>
             </li>
             <li>

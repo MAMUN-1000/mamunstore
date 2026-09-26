@@ -47,7 +47,8 @@ export const HomePage = () => {
           axiosInstance.get('/products', { params: { limit: 12 } }),
         ]);
 
-        setCategories(catRes.data.data.categories || []);
+        const loadedCategories = catRes.data.data.categories || [];
+        setCategories(loadedCategories);
         setNewArrivals(newestRes.data.data.products || []);
         setBudgetDeals(dealsRes.data.data.products || []);
 
@@ -80,6 +81,22 @@ export const HomePage = () => {
     fetchHomeData();
   }, []);
 
+  const handleCategorySelect = (e) => {
+    const selected = e.target.value;
+    setSearchCategory(selected);
+
+    const params = new URLSearchParams();
+    if (selected) {
+      params.append('category', selected);
+    }
+    if (searchQuery.trim()) {
+      params.append('search', searchQuery.trim());
+    }
+
+    const queryStr = params.toString();
+    navigate(queryStr ? `/products?${queryStr}` : '/products');
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (!searchQuery.trim() && !searchCategory) {
@@ -88,8 +105,8 @@ export const HomePage = () => {
     }
 
     const params = new URLSearchParams();
-    if (searchQuery.trim()) params.append('search', searchQuery.trim());
     if (searchCategory) params.append('category', searchCategory);
+    if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
     navigate(`/products?${params.toString()}`);
   };
@@ -144,12 +161,12 @@ export const HomePage = () => {
               <div className="w-full sm:w-44 flex-shrink-0 border-b sm:border-b-0 sm:border-r border-slate-200 px-3 py-1">
                 <select
                   value={searchCategory}
-                  onChange={(e) => setSearchCategory(e.target.value)}
+                  onChange={handleCategorySelect}
                   className="w-full bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
                 >
                   <option value="">All Categories</option>
                   {categories.map((c) => (
-                    <option key={c.id} value={c.id} className="text-slate-800">
+                    <option key={c.id} value={c.name} className="text-slate-800">
                       {c.name}
                     </option>
                   ))}
@@ -223,7 +240,7 @@ export const HomePage = () => {
             {categories.map((cat) => (
               <Link
                 key={cat.id}
-                to={`/products?category=${cat.id}`}
+                to={`/products?category=${encodeURIComponent(cat.name)}`}
                 className="p-5 bg-white border border-slate-200 rounded-2xl shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all flex items-center justify-between group"
               >
                 <div className="flex items-center gap-3.5">

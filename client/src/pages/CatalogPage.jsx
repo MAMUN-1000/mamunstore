@@ -9,6 +9,7 @@ export const CatalogPage = () => {
 
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 6, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,37 +21,100 @@ export const CatalogPage = () => {
   const sortBy = searchParams.get('sortBy') || 'newest';
   const currentPage = parseInt(searchParams.get('page'), 10) || 1;
 
-  // Resolve category (supports numeric ID or case-insensitive category name)
-  const matchedCategory = categories.find(
-    (c) => String(c.id) === rawCategoryParam || c.name.toLowerCase() === rawCategoryParam.toLowerCase()
-  );
-  const selectedCategory = matchedCategory ? String(matchedCategory.id) : rawCategoryParam;
-
-  // Search input state (initialized from URL)
-  const [searchTerm, setSearchTerm] = useState(searchParam);
+  // Local search input state (typing alone does NOT trigger API requests)
+  const [searchInput, setSearchInput] = useState(searchParam);
   const [prevSearchParam, setPrevSearchParam] = useState(searchParam);
 
-  // Sync search input if URL search param changes without cascading effect renders
+  // Keep search input synced when URL search param changes (e.g. navigation, back/forward)
   if (searchParam !== prevSearchParam) {
     setPrevSearchParam(searchParam);
-    setSearchTerm(searchParam);
+    setSearchInput(searchParam);
   }
+
+  // Resolve category: supports numeric ID, category name, or slug
+  const resolveCategoryId = (param, list) => {
+    if (!param) return '';
+    const trimmed = String(param).trim();
+    if (!trimmed) return '';
+
+    if (list && list.length > 0) {
+      // 1. Direct match by numeric ID against loaded categories
+      const byId = list.find((c) => String(c.id) === trimmed);
+      if (byId) return String(byId.id);
+
+      // 2. Direct match by Name or Slug (case-insensitive)
+      const lower = trimmed.toLowerCase();
+      const cleanLower = lower.replace(/[^a-z0-9]/g, '');
+      const byNameOrSlug = list.find(
+        (c) =>
+          c.name.toLowerCase() === lower ||
+          (c.slug && c.slug.toLowerCase() === lower) ||
+          c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanLower ||
+          (c.slug && c.slug.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanLower)
+      );
+      if (byNameOrSlug) return String(byNameOrSlug.id);
+
+      // 3. Partial keyword match (e.g., "Audio" -> "Audio & Gear")
+      const byPartial = list.find(
+        (c) =>
+          c.name.toLowerCase().includes(lower) ||
+          (c.slug && c.slug.toLowerCase().includes(lower))
+      );
+      if (byPartial) return String(byPartial.id);
+
+      // 4. Fallback for 1-based index (e.g., ?category=1 -> list[0])
+      const num = parseInt(trimmed, 10);
+      if (!isNaN(num) && num >= 1 && num <= list.length) {
+        return String(list[num - 1].id);
+      }
+    } else {
+      // If categories list has not loaded yet, check if it's already an integer ID
+      const num = parseInt(trimmed, 10);
+      if (!isNaN(num) && String(num) === trimmed) {
+        return String(num);
+      }
+    }
+
+    return null; // non-numeric string waiting for categories to resolve
+  };
+
+  const resolvedCategory = resolveCategoryId(rawCategoryParam, categories);
+  const matchedCategoryObj = categories.find((c) => String(c.id) === resolvedCategory);
 
   // Fetch categories once on mount
   useEffect(() => {
+    let isMounted = true;
     const fetchCategories = async () => {
       try {
         const res = await axiosInstance.get('/categories');
-        setCategories(res.data.data.categories || []);
+        const list = res.data.data.categories || [];
+        if (isMounted) {
+          setCategories(list);
+          setCategoriesLoaded(true);
+        }
       } catch (err) {
         console.error('Failed to load categories:', err);
+        if (isMounted) {
+          setCategoriesLoaded(true);
+        }
       }
     };
     fetchCategories();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Fetch products whenever filters, page, or retryCount changes
+  // Fetch products whenever applied URL filters (category, search, sort, page) or retryCount change
   useEffect(() => {
+    // If a non-numeric category was requested in URL but categories haven't loaded yet,
+    // wait for categories to resolve to prevent un-filtered backend fetch
+    if (rawCategoryParam && resolvedCategory === null && !categoriesLoaded) {
+      return;
+    }
+
+    let isMounted = true;
+
     const fetchProducts = async () => {
       setLoading(true);
       setError(null);
@@ -61,32 +125,43 @@ export const CatalogPage = () => {
           sortBy,
         };
 
-        if (searchTerm.trim()) {
-          params.search = searchTerm.trim();
+        if (searchParam.trim()) {
+          params.search = searchParam.trim();
         }
-        if (selectedCategory) {
-          params.category = selectedCategory;
+        if (resolvedCategory) {
+          params.category = resolvedCategory;
         }
 
         const res = await axiosInstance.get('/products', { params });
-        setProducts(res.data.data.products);
-        setPagination(res.data.data.pagination);
+        if (isMounted) {
+          setProducts(res.data.data.products);
+          setPagination(res.data.data.pagination);
+        }
       } catch (err) {
         console.error('Failed to fetch products:', err);
-        setError(err.response?.data?.message || err.message || 'Failed to load products');
+        if (isMounted) {
+          setError(err.response?.data?.message || err.message || 'Failed to load products');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory, sortBy, currentPage, retryCount]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchParam, rawCategoryParam, resolvedCategory, sortBy, currentPage, retryCount, categoriesLoaded]);
 
   const handleCategoryChange = (e) => {
     const nextCategory = e.target.value;
     const nextParams = new URLSearchParams(searchParams);
     if (nextCategory) {
-      nextParams.set('category', nextCategory);
+      const matched = categories.find((c) => String(c.id) === nextCategory);
+      nextParams.set('category', matched ? matched.name : nextCategory);
     } else {
       nextParams.delete('category');
     }
@@ -102,6 +177,7 @@ export const CatalogPage = () => {
     } else {
       nextParams.delete('sortBy');
     }
+    nextParams.delete('page');
     setSearchParams(nextParams);
   };
 
@@ -116,28 +192,21 @@ export const CatalogPage = () => {
   };
 
   const handleResetFilters = () => {
-    setSearchTerm('');
+    setSearchInput('');
     setSearchParams({});
   };
 
-  const handleSearchInput = (e) => {
-    setSearchTerm(e.target.value);
-    if (currentPage !== 1) {
-      handlePageChange(1);
+  const handleSearchSubmit = (e) => {
+    e?.preventDefault?.();
+    const trimmed = searchInput.trim();
+    const nextParams = new URLSearchParams(searchParams);
+    if (trimmed) {
+      nextParams.set('search', trimmed);
+    } else {
+      nextParams.delete('search');
     }
-  };
-
-  const handleSearchKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      const nextParams = new URLSearchParams(searchParams);
-      if (searchTerm.trim()) {
-        nextParams.set('search', searchTerm.trim());
-      } else {
-        nextParams.delete('search');
-      }
-      nextParams.delete('page');
-      setSearchParams(nextParams);
-    }
+    nextParams.delete('page');
+    setSearchParams(nextParams);
   };
 
   return (
@@ -162,23 +231,28 @@ export const CatalogPage = () => {
       <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* 1. Keyword Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <form onSubmit={handleSearchSubmit} className="relative flex items-center">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             <input
               type="text"
-              value={searchTerm}
-              onChange={handleSearchInput}
-              onKeyDown={handleSearchKeyDown}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search products..."
-              className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+              className="w-full pl-10 pr-20 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
             />
-          </div>
+            <button
+              type="submit"
+              className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+            >
+              Search
+            </button>
+          </form>
 
           {/* 2. Category Filter */}
           <div className="relative">
             <Filter className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             <select
-              value={selectedCategory}
+              value={matchedCategoryObj ? String(matchedCategoryObj.id) : ''}
               onChange={handleCategoryChange}
               className="w-full pl-10 pr-8 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition appearance-none bg-white text-slate-700 cursor-pointer"
             >
