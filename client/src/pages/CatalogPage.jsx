@@ -1,20 +1,40 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import ProductCard from '../components/ProductCard';
 import { Search, Filter, ArrowUpDown, RotateCcw, RefreshCw, AlertCircle, PackageX } from 'lucide-react';
 
 export const CatalogPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 6, totalPages: 1 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [sortBy, setSortBy] = useState('newest');
-  const [currentPage, setCurrentPage] = useState(1);
+  // Extract query params from URL
+  const rawCategoryParam = searchParams.get('category') || '';
+  const searchParam = searchParams.get('search') || '';
+  const sortBy = searchParams.get('sortBy') || 'newest';
+  const currentPage = parseInt(searchParams.get('page'), 10) || 1;
+
+  // Resolve category (supports numeric ID or case-insensitive category name)
+  const matchedCategory = categories.find(
+    (c) => String(c.id) === rawCategoryParam || c.name.toLowerCase() === rawCategoryParam.toLowerCase()
+  );
+  const selectedCategory = matchedCategory ? String(matchedCategory.id) : rawCategoryParam;
+
+  // Search input state (initialized from URL)
+  const [searchTerm, setSearchTerm] = useState(searchParam);
+  const [prevSearchParam, setPrevSearchParam] = useState(searchParam);
+
+  // Sync search input if URL search param changes without cascading effect renders
+  if (searchParam !== prevSearchParam) {
+    setPrevSearchParam(searchParam);
+    setSearchTerm(searchParam);
+  }
 
   // Fetch categories once on mount
   useEffect(() => {
@@ -29,7 +49,7 @@ export const CatalogPage = () => {
     fetchCategories();
   }, []);
 
-  // Fetch products whenever filters or page changes
+  // Fetch products whenever filters, page, or retryCount changes
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
@@ -60,13 +80,64 @@ export const CatalogPage = () => {
     };
 
     fetchProducts();
-  }, [searchTerm, selectedCategory, sortBy, currentPage]);
+  }, [searchTerm, selectedCategory, sortBy, currentPage, retryCount]);
+
+  const handleCategoryChange = (e) => {
+    const nextCategory = e.target.value;
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextCategory) {
+      nextParams.set('category', nextCategory);
+    } else {
+      nextParams.delete('category');
+    }
+    nextParams.delete('page');
+    setSearchParams(nextParams);
+  };
+
+  const handleSortChange = (e) => {
+    const nextSort = e.target.value;
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextSort && nextSort !== 'newest') {
+      nextParams.set('sortBy', nextSort);
+    } else {
+      nextParams.delete('sortBy');
+    }
+    setSearchParams(nextParams);
+  };
+
+  const handlePageChange = (newPage) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (newPage > 1) {
+      nextParams.set('page', newPage.toString());
+    } else {
+      nextParams.delete('page');
+    }
+    setSearchParams(nextParams);
+  };
 
   const handleResetFilters = () => {
     setSearchTerm('');
-    setSelectedCategory('');
-    setSortBy('newest');
-    setCurrentPage(1);
+    setSearchParams({});
+  };
+
+  const handleSearchInput = (e) => {
+    setSearchTerm(e.target.value);
+    if (currentPage !== 1) {
+      handlePageChange(1);
+    }
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      const nextParams = new URLSearchParams(searchParams);
+      if (searchTerm.trim()) {
+        nextParams.set('search', searchTerm.trim());
+      } else {
+        nextParams.delete('search');
+      }
+      nextParams.delete('page');
+      setSearchParams(nextParams);
+    }
   };
 
   return (
@@ -96,10 +167,8 @@ export const CatalogPage = () => {
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1); // Reset to page 1 on new search
-              }}
+              onChange={handleSearchInput}
+              onKeyDown={handleSearchKeyDown}
               placeholder="Search products..."
               className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
             />
@@ -110,15 +179,12 @@ export const CatalogPage = () => {
             <Filter className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             <select
               value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={handleCategoryChange}
               className="w-full pl-10 pr-8 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition appearance-none bg-white text-slate-700 cursor-pointer"
             >
               <option value="">All Categories</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
+                <option key={cat.id} value={String(cat.id)}>
                   {cat.name} ({cat._count?.products || 0})
                 </option>
               ))}
@@ -130,7 +196,7 @@ export const CatalogPage = () => {
             <ArrowUpDown className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             <select
               value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              onChange={handleSortChange}
               className="w-full pl-10 pr-8 py-2 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition appearance-none bg-white text-slate-700 cursor-pointer"
             >
               <option value="newest">Sort: Newest Arrivals</option>
@@ -164,7 +230,7 @@ export const CatalogPage = () => {
           <h3 className="font-bold text-rose-900">Failed to Load Products</h3>
           <p className="text-xs text-rose-700">{error}</p>
           <button
-            onClick={() => setCurrentPage(1)}
+            onClick={() => setRetryCount((c) => c + 1)}
             className="px-4 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition"
           >
             Try Again
@@ -207,7 +273,7 @@ export const CatalogPage = () => {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() => handlePageChange(Math.max(currentPage - 1, 1))}
                   disabled={pagination.page <= 1}
                   className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
@@ -217,7 +283,7 @@ export const CatalogPage = () => {
                 {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((pageNum) => (
                   <button
                     key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
+                    onClick={() => handlePageChange(pageNum)}
                     className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
                       pagination.page === pageNum
                         ? 'bg-emerald-600 text-white shadow-sm'
@@ -229,7 +295,7 @@ export const CatalogPage = () => {
                 ))}
 
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages))}
+                  onClick={() => handlePageChange(Math.min(currentPage + 1, pagination.totalPages))}
                   disabled={pagination.page >= pagination.totalPages}
                   className="px-3.5 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
