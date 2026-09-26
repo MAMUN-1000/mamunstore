@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import axiosInstance from '../api/axiosInstance';
@@ -20,6 +20,7 @@ import {
   Building,
   HelpCircle,
   Tag,
+  Sparkles,
 } from 'lucide-react';
 
 const BD_DIVISIONS = [
@@ -80,6 +81,9 @@ export const CheckoutPage = () => {
   const { cartItems, subtotal, shipping, estimatedTax, grandTotal, clearCart } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const paymentStatus = searchParams.get('payment');
+  const paymentMessage = searchParams.get('message');
 
   // Destination Region Toggle: Bangladesh vs International
   const [destinationType, setDestinationType] = useState('bangladesh'); // 'bangladesh' | 'international'
@@ -234,6 +238,35 @@ export const CheckoutPage = () => {
     try {
       setSubmitting(true);
 
+      if (paymentMethod === 'bkash_sandbox') {
+        const payload = {
+          items: cartItems.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+          })),
+          couponCode: appliedCoupon ? appliedCoupon.coupon.code : null,
+          shippingAddress: {
+            recipientName: user?.name,
+            country: destinationType === 'bangladesh' ? 'Bangladesh' : shippingAddress.country,
+            division: destinationType === 'bangladesh' ? shippingAddress.division : shippingAddress.state,
+            city: shippingAddress.city,
+            street: shippingAddress.street,
+            postalCode: shippingAddress.postalCode,
+            phone: shippingAddress.phone,
+            deliveryInstructions: shippingAddress.deliveryInstructions,
+          },
+        };
+
+        const res = await axiosInstance.post('/bkash/create-payment', payload);
+        const { bkashURL } = res.data.data;
+        if (bkashURL) {
+          window.location.href = bkashURL;
+          return;
+        } else {
+          throw new Error('bKash gateway URL was not returned.');
+        }
+      }
+
       // Generate a simulated Transaction ID (TrxID) for bKash or Nagad
       let simulatedTrxId = null;
       if (paymentMethod === 'bkash') {
@@ -318,6 +351,31 @@ export const CheckoutPage = () => {
           <span>$1.00 USD = ৳120 BDT</span>
         </div>
       </div>
+
+      {/* bKash Payment Callback Status Alert */}
+      {paymentStatus === 'cancelled' && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-xs text-amber-900 animate-fadeIn">
+          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div className="space-y-1">
+            <strong className="font-bold block">bKash Payment Cancelled</strong>
+            <span>
+              Your bKash transaction was cancelled. Your cart and selected items have been preserved. You can try again or choose another payment method below.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {paymentStatus === 'failed' && (
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3 text-xs text-rose-900 animate-fadeIn">
+          <AlertCircle className="w-5 h-5 text-rose-600 mt-0.5 flex-shrink-0" />
+          <div className="space-y-1">
+            <strong className="font-bold block">bKash Payment Failed</strong>
+            <span>
+              {paymentMessage || 'The payment could not be completed by bKash. Please try again or select another payment method.'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Error Alert */}
       {errorMessage && (
@@ -638,7 +696,36 @@ export const CheckoutPage = () => {
 
             {/* Payment Method Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {/* bKash */}
+              {/* bKash Official Sandbox */}
+              <label
+                className={`p-4 rounded-2xl border cursor-pointer flex items-start gap-3 transition relative ${
+                  paymentMethod === 'bkash_sandbox'
+                    ? 'border-[#E2136E] bg-pink-50/40 text-slate-900 ring-2 ring-[#E2136E]/30'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="payment"
+                  checked={paymentMethod === 'bkash_sandbox'}
+                  onChange={() => setPaymentMethod('bkash_sandbox')}
+                  className="mt-1 text-[#E2136E] focus:ring-[#E2136E]"
+                />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-xs text-[#E2136E]">bKash (Official Sandbox)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E2136E] text-white flex items-center gap-1">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Live Gateway
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500 block leading-tight">
+                    Official bKash payment portal with live sandbox test credentials.
+                  </span>
+                </div>
+              </label>
+
+              {/* bKash Simulation */}
               <label
                 className={`p-4 rounded-2xl border cursor-pointer flex items-start gap-3 transition relative ${
                   paymentMethod === 'bkash'
@@ -655,9 +742,9 @@ export const CheckoutPage = () => {
                 />
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-xs text-[#E2136E]">bKash (বিকাশ)</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E2136E] text-white">
-                      MFS
+                    <span className="font-extrabold text-xs text-[#E2136E]">bKash (Simulation)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E2136E]/80 text-white">
+                      Instant Sim
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-500 block leading-tight">
@@ -752,6 +839,40 @@ export const CheckoutPage = () => {
             </div>
 
             {/* Dynamic Payment Details Inputs */}
+            {paymentMethod === 'bkash_sandbox' && (
+              <div className="p-4 bg-pink-50/60 border border-pink-200 rounded-2xl space-y-3 animate-fadeIn text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#E2136E] flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[#E2136E]" />
+                    Official bKash Sandbox Gateway
+                  </span>
+                  <span className="text-[11px] text-pink-700 font-mono">
+                    Total: {formatBDT(grandTotal)}
+                  </span>
+                </div>
+                <p className="text-slate-600 leading-relaxed text-[11px]">
+                  You will be securely redirected to the official bKash checkout page to complete the transaction. Use the following sandbox test credentials:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-white/90 p-3 rounded-xl border border-pink-200 text-[11px] font-mono shadow-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold">Test Wallet</span>
+                    <span className="font-bold text-slate-800">01770618575</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold">OTP</span>
+                    <span className="font-bold text-slate-800">123456</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold">PIN</span>
+                    <span className="font-bold text-slate-800">12121</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  🔒 Test Environment: No real money is deducted. The official gateway will issue a live sandbox TrxID.
+                </p>
+              </div>
+            )}
+
             {paymentMethod === 'bkash' && (
               <div className="p-4 bg-pink-50/60 border border-pink-200 rounded-2xl space-y-3 animate-fadeIn text-xs">
                 <div className="flex items-center justify-between">
@@ -1052,11 +1173,13 @@ export const CheckoutPage = () => {
               {submitting ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  Processing Order...
+                  {paymentMethod === 'bkash_sandbox' ? 'Redirecting to bKash Gateway...' : 'Processing Order...'}
                 </>
               ) : (
                 <>
-                  Confirm & Place Order ({formatBDT(finalGrandTotal)})
+                  {paymentMethod === 'bkash_sandbox'
+                    ? `Proceed to bKash Gateway (${formatBDT(finalGrandTotal)})`
+                    : `Confirm & Place Order (${formatBDT(finalGrandTotal)})`}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

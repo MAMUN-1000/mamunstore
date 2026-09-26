@@ -176,7 +176,7 @@ export const createOrder = async ({ userId, items, shippingAddress, couponCode }
 
       // 5. Create the Order with coupon snapshots
       const paymentMethod = typeof shippingAddress === 'object' ? shippingAddress?.paymentMethod : 'card';
-      const initialStatus = paymentMethod === 'cod' ? 'PENDING' : 'PAID';
+      const initialStatus = (paymentMethod === 'cod' || paymentMethod === 'bkash_sandbox') ? 'PENDING' : 'PAID';
 
       const order = await tx.order.create({
         data: {
@@ -529,4 +529,179 @@ export const updateOrderStatusAdmin = async (orderId, newStatus) => {
   }
 
   return updatedOrder;
+};
+
+/**
+ * Update payment metadata in order.shippingAddress JSON
+ */
+export const updateOrderPaymentMetadata = async (orderId, paymentMetadata) => {
+  const parsedId = parseInt(orderId, 10);
+  const existingOrder = await prisma.order.findUnique({ where: { id: parsedId } });
+  if (!existingOrder) return null;
+
+  let currentAddress = {};
+  try {
+    currentAddress =
+      typeof existingOrder.shippingAddress === 'string'
+        ? JSON.parse(existingOrder.shippingAddress)
+        : existingOrder.shippingAddress || {};
+  } catch {
+    currentAddress = { rawAddress: existingOrder.shippingAddress };
+  }
+
+  currentAddress.paymentDetails = {
+    ...(currentAddress.paymentDetails || {}),
+    ...paymentMetadata,
+  };
+
+  return await prisma.order.update({
+    where: { id: parsedId },
+    data: {
+      shippingAddress: JSON.stringify(currentAddress),
+    },
+  });
+};
+
+/**
+ * Confirm bKash payment and transition order from PENDING to PAID (idempotent)
+ */
+export const confirmOrderPayment = async (orderId, paymentResult) => {
+  const parsedId = parseInt(orderId, 10);
+  const existingOrder = await prisma.order.findUnique({
+    where: { id: parsedId },
+    include: { items: { include: { product: true } } },
+  });
+
+  if (!existingOrder) {
+    const err = new Error(`Order #${orderId} not found.`);
+    err.status = 404;
+    throw err;
+  }
+
+  // Idempotency: if already paid, return early without duplicate execution or notifications
+  if (existingOrder.status === 'PAID') {
+    return existingOrder;
+  }
+
+  if (existingOrder.status !== 'PENDING') {
+    const err = new Error(
+      `Order #${orderId} cannot be confirmed because it is in status ${existingOrder.status}.`
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  let currentAddress = {};
+  try {
+    currentAddress =
+      typeof existingOrder.shippingAddress === 'string'
+        ? JSON.parse(existingOrder.shippingAddress)
+        : existingOrder.shippingAddress || {};
+  } catch {
+    currentAddress = { rawAddress: existingOrder.shippingAddress };
+  }
+
+  currentAddress.paymentMethod = 'bkash_sandbox';
+  currentAddress.paymentDetails = {
+    methodName: 'bKash (Official Sandbox)',
+    accountNumber: paymentResult.customerMsisdn || '01770618575',
+    trxId: paymentResult.trxID,
+    paymentID: paymentResult.paymentID,
+    paymentExecuteTime: paymentResult.paymentExecuteTime || new Date().toISOString(),
+    status: 'Completed',
+  };
+
+  const updatedOrder = await prisma.order.update({
+    where: { id: parsedId },
+    data: {
+      status: 'PAID',
+      shippingAddress: JSON.stringify(currentAddress),
+    },
+    include: {
+      items: { include: { product: true } },
+    },
+  });
+
+  // Create in-app notification for the customer
+  try {
+    await prisma.notification.create({
+      data: {
+        userId: updatedOrder.userId,
+        type: 'ORDER_STATUS_CHANGED',
+        title: 'Payment Confirmed',
+        message: `Your payment of ৳${updatedOrder.totalAmount.toFixed(2)} for Order #${updatedOrder.id} was confirmed via bKash (TrxID: ${paymentResult.trxID}).`,
+        link: `/orders`,
+      },
+    });
+  } catch (err) {
+    console.error('Failed to create payment notification:', err.message);
+  }
+
+  return updatedOrder;
+};
+
+/**
+ * Cancel a PENDING order and safely restore reserved product stock
+ */
+export const cancelOrderAndRestoreStock = async (orderId, reason = 'Payment cancelled') => {
+  const parsedId = parseInt(orderId, 10);
+  const existingOrder = await prisma.order.findUnique({
+    where: { id: parsedId },
+    include: { items: true },
+  });
+
+  if (!existingOrder) return null;
+
+  // Only cancel if currently PENDING to avoid cancelling already completed or cancelled orders
+  if (existingOrder.status !== 'PENDING') {
+    return existingOrder;
+  }
+
+  return await prisma.$transaction(async (tx) => {
+    // 1. Restore product stock
+    for (const item of existingOrder.items) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: {
+          stock: { increment: item.quantity },
+        },
+      });
+    }
+
+    // 2. If coupon was applied, revert coupon usedCount and delete usage record
+    if (existingOrder.couponId) {
+      await tx.coupon.update({
+        where: { id: existingOrder.couponId },
+        data: { usedCount: { decrement: 1 } },
+      });
+      await tx.couponUsage.deleteMany({
+        where: { orderId: existingOrder.id },
+      });
+    }
+
+    // 3. Update order status and payment details
+    let currentAddress = {};
+    try {
+      currentAddress =
+        typeof existingOrder.shippingAddress === 'string'
+          ? JSON.parse(existingOrder.shippingAddress)
+          : existingOrder.shippingAddress || {};
+    } catch {
+      currentAddress = { rawAddress: existingOrder.shippingAddress };
+    }
+
+    currentAddress.paymentDetails = {
+      ...(currentAddress.paymentDetails || {}),
+      status: 'Cancelled',
+      cancelReason: reason,
+    };
+
+    return await tx.order.update({
+      where: { id: parsedId },
+      data: {
+        status: 'CANCELLED',
+        shippingAddress: JSON.stringify(currentAddress),
+      },
+    });
+  });
 };

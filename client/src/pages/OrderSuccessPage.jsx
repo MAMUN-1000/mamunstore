@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 import axiosInstance from '../api/axiosInstance';
 import { formatBDT, formatUSD } from '../utils/currency';
 import {
@@ -18,6 +19,7 @@ import {
 
 export const OrderSuccessPage = () => {
   const { id } = useParams();
+  const { clearCart } = useCart();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,6 +31,8 @@ export const OrderSuccessPage = () => {
       try {
         const res = await axiosInstance.get(`/orders/${id}`);
         setOrder(res.data.data.order);
+        // Wipe local cart once confirmed order is fetched
+        clearCart();
       } catch (err) {
         console.error('Failed to fetch order confirmation:', err);
         setError(err.response?.data?.message || 'Failed to retrieve order confirmation.');
@@ -38,7 +42,7 @@ export const OrderSuccessPage = () => {
     };
 
     fetchOrder();
-  }, [id]);
+  }, [id, clearCart]);
 
   if (loading) {
     return (
@@ -91,6 +95,8 @@ export const OrderSuccessPage = () => {
           <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto">
             {paymentMethod === 'cod'
               ? 'Thank you! Your order is confirmed and will be dispatched. Please keep cash ready for the delivery rider.'
+              : paymentMethod === 'bkash_sandbox'
+              ? 'Thank you! Your official bKash payment was verified successfully and your order is confirmed.'
               : 'Thank you! Your payment authorization was successful and we are preparing your shipment.'}
           </p>
         </div>
@@ -195,7 +201,7 @@ export const OrderSuccessPage = () => {
               <div className="flex items-center gap-2">
                 <span
                   className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                    paymentMethod === 'bkash'
+                    paymentMethod === 'bkash' || paymentMethod === 'bkash_sandbox'
                       ? 'bg-[#E2136E] text-white'
                       : paymentMethod === 'nagad'
                       ? 'bg-[#F7941E] text-white'
@@ -204,18 +210,26 @@ export const OrderSuccessPage = () => {
                       : 'bg-blue-100 text-blue-800'
                   }`}
                 >
-                  {paymentDetails.methodName || paymentMethod.toUpperCase()}
+                  {paymentDetails.methodName || (paymentMethod === 'bkash_sandbox' ? 'bKash (Official Sandbox)' : paymentMethod.toUpperCase())}
                 </span>
               </div>
-              {paymentDetails.trxId && (
-                <div className="font-mono text-[11px] text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 inline-block">
-                  <span className="text-slate-400">TrxID: </span>
-                  <span className="font-bold text-slate-900">{paymentDetails.trxId}</span>
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                {paymentDetails.trxId && (
+                  <div className="font-mono text-[11px] text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 inline-block">
+                    <span className="text-slate-400">TrxID: </span>
+                    <span className="font-bold text-slate-900">{paymentDetails.trxId}</span>
+                  </div>
+                )}
+                {paymentDetails.paymentID && (
+                  <div className="font-mono text-[11px] text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200/60 inline-block">
+                    <span className="text-slate-400">bKash ID: </span>
+                    <span className="font-bold text-slate-900">{paymentDetails.paymentID}</span>
+                  </div>
+                )}
+              </div>
               {paymentDetails.accountNumber && (
                 <p className="text-[11px] text-slate-500 font-mono">
-                  Account: {paymentDetails.accountNumber}
+                  Wallet / Account: {paymentDetails.accountNumber}
                 </p>
               )}
             </div>

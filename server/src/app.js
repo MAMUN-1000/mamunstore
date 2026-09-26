@@ -17,6 +17,7 @@ import adminRoutes from './routes/admin.routes.js';
 import wishlistRoutes from './routes/wishlist.routes.js';
 import couponRoutes from './routes/coupon.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import bkashRoutes from './routes/bkash.routes.js';
 
 const app = express();
 
@@ -154,6 +155,9 @@ app.use('/api/coupons', couponRoutes);
 
 // In-App Notification Routes
 app.use('/api/notifications', notificationRoutes);
+
+// bKash Sandbox Payment Gateway Routes
+app.use('/api/bkash', bkashRoutes);
 
 // ==========================================
 // Error & 404 Handlers
